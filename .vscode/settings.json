@@ -1,5 +1,5 @@
 {
   "explorer.fileNesting.patterns": {
-    "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb, bun.lock, .gitignore, .releaserc, README.md, tsconfig.json"
+    "package.json": "astro.config.*, package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb, bun.lock, .gitignore, .releaserc, README.md, tsconfig.json, eslint.config.js, pnpm-workspace.yaml"
   }
 }

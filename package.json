@@ -3,10 +3,6 @@
   "description": "Astro component to copy the headers config from your Astro configuration to a valid Cloudflare Pages configuration on project build.",
   "version": "0.0.1",
   "type": "module",
-  "workspaces": [
-    "demo",
-    "packages/*"
-  ],
   "exports": {
     ".": "./index.ts"
   },
@@ -28,8 +24,8 @@
     "build": "astro check && astro build",
     "clear": "rm -rf dist .astro node_modules",
     "dev": "astro dev",
-    "lint": "eslint .",
-    "lint:fix": "eslint --ext .astro . --fix",
+    "lint": "eslint ./src",
+    "lint:fix": "eslint --fix",
     "start": "astro dev",
     "preview": "astro build && astro preview",
     "test": "pnpm run test:unit",
@@ -38,9 +34,14 @@
     "upgrade": "pnpm dlx @astrojs/upgrade"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.2.0",
     "@semantic-release/git": "^10.0.1",
     "@types/node": "^22.13.1",
+    "@typescript-eslint/eslint-plugin": "^8.24.0",
+    "@typescript-eslint/parser": "^8.24.0",
     "astro": "^5.2.6",
+    "astro-eslint-parser": "^1.2.1",
+    "eslint-plugin-import": "^2.31.0",
     "semantic-release": "^24.2.2"
   },
   "peerDependencies": {
