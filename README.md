@@ -1,35 +1,137 @@
-# Astro Starter Kit: Component Package
+# astro-cloudflare-pages-headers
 
-This is a template for an Astro component library. Use this template for writing components to use in multiple projects or publish to NPM.
+A lightweight integration for [Astro](https://astro.build/) that automatically generates a [Cloudflare Pages](https://pages.cloudflare.com/) `_headers` file for deployments based on your server header configuration.
 
-```sh
-npm create astro@latest -- --template component
+## Features
+
+- Automatic `_headers` generation: Reads header settings from your `astro.config.mjs` and generates a `_headers` file during build.
+- Flexible configuration: Supports both flat and nested header formats.
+- Informative logging: Provides useful log messages during setup and build
+
+## Installation
+
+Install the integration via `npm`, `pnpm`, or `yarn`:
+
+```bash
+npm install astro-cloudflare-pages-headers
 ```
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/withastro/astro/tree/latest/examples/non-html-pages)
-[![Open with CodeSandbox](https://assets.codesandbox.io/github/button-edit-lime.svg)](https://codesandbox.io/p/sandbox/github/withastro/astro/tree/latest/examples/non-html-pages)
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/withastro/astro?devcontainer_path=.devcontainer/component/devcontainer.json)
-
-## 🚀 Project Structure
-
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-/
-├── index.ts
-├── src
-│   └── MyComponent.astro
-├── tsconfig.json
-├── package.json
+```bash
+pnpm install astro-cloudflare-pages-headers
 ```
 
-The `index.ts` file is the "entry point" for your package. Export your components in `index.ts` to make them importable from your package.
+```bash
+yarn add astro-cloudflare-pages-headers
+```
 
-## 🧞 Commands
+## Usage
 
-All commands are run from the root of the project, from a terminal:
+Add the integration to your Astro configuration file (`astro.config.mjs`). The integration looks for header settings in the `server.headers` property:
 
-| Command       | Action                                                                                                                                                                                                                           |
-| :------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm link`    | Registers this package locally. Run `npm link my-component-library` in an Astro project to install your components                                                                                                               |
-| `npm publish` | [Publishes](https://docs.npmjs.com/creating-and-publishing-unscoped-public-packages#publishing-unscoped-public-packages) this package to NPM. Requires you to be [logged in](https://docs.npmjs.com/cli/v8/commands/npm-adduser) |
+### Example with Flat Headers
+
+`astro.config.mjs`:
+
+```js,ts
+import { defineConfig } from 'astro/config';
+import { astroCloudflarePagesHeaders } from 'astro-cloudflare-pages-headers';
+
+export default defineConfig({
+  integrations: [
+    astroCloudflarePagesHeaders(),
+  ],
+  server: {
+    headers: {
+      'X-Custom-Header': 'my-value',
+      'X-Another-Header': 'another-value'
+    },
+  },
+});
+```
+
+This configuration generates the following `_headers` file:
+
+```plaintext
+/*
+  X-Custom-Header: my-value
+  X-Another-Header: another-value
+```
+
+### Example with Nested Headers
+
+`astro.config.mjs`:
+```js,ts
+import { defineConfig } from 'astro/config';
+import { astroCloudflarePagesHeaders } from 'astro-cloudflare-pages-headers';
+
+export default defineConfig({
+  integrations: [
+    astroCloudflarePagesHeaders(),
+  ],
+  server: {
+    headers: {
+      '/api': {
+        'Cache-Control': 'max-age=3600',
+      },
+      '/static': {
+        'X-Frame-Options': 'DENY',
+      },
+    },
+  },
+});
+```
+
+This configuration generates the following `_headers` file:
+
+```plaintext
+/api
+  Cache-Control: max-age=3600
+
+/static
+  X-Frame-Options: DENY
+```
+
+## How It Works
+
+### Setup
+
+`astro:config:setup`:
+
+The integration reads your header configuation from `config.server.headers` and stores it internally.
+
+### Build
+
+`astro:build:done`:
+
+- If headers are configured, it converts them into the appropriate Cloudflare Pages format.
+- It writes the generated content to a `_headers` file in your build output directory.
+- Logs inform you if the file is successfully written or if any errors occur.
+- If no headers are configured, it logs a warning and skips file generation.
+
+## Development
+
+### Running Unit Tests
+
+This project uses [Vitest](https://vitest.dev/) for testing. To run the tests:
+
+Unit tests cover various scenarios including flat headers, nested headers, error handling, and logging verification.
+
+```bash
+npm test
+```
+
+```bash
+pnpm test
+```
+
+```bash
+yarn test
+```
+
+## Contributing
+
+Contributions and improvements are welcome. Feel free to open issues or submit pull requests on the repository.
+
+## License
+
+This project is licensed under the [MIT License](https://opensource.org/license/mit). See the [LICENSE](LICENSE) file for details.
