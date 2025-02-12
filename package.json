@@ -1,6 +1,6 @@
 {
   "name": "astro-cloudflare-pages-headers",
-  "description": "Astro component to copy the headers config from your Astro configuration to a valid Cloudflare Pages configuration on project build.",
+  "description": "A lightweight integration for Astro that automatically generates a Cloudflare Pages _headers file for deployments based on your server header configuration.",
   "version": "0.0.1",
   "type": "module",
   "exports": {
