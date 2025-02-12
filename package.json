@@ -1,7 +1,12 @@
 {
   "name": "astro-cloudflare-pages-headers",
+  "description": "Astro component to copy the headers config from your Astro configuration to a valid Cloudflare Pages configuration on project build.",
   "version": "0.0.1",
   "type": "module",
+  "workspaces": [
+    "demo",
+    "packages/*"
+  ],
   "exports": {
     ".": "./index.ts"
   },
@@ -10,11 +15,33 @@
     "index.ts"
   ],
   "keywords": [
-    "astro-component"
+    "astro",
+    "astro-component",
+    "cloudflare-pages",
+    "tooling",
+    "utils",
+    "utility",
+    "withastro"
   ],
-  "scripts": {},
+  "scripts": {
+    "astro": "astro",
+    "build": "astro check && astro build",
+    "clear": "rm -rf dist .astro node_modules",
+    "dev": "astro dev",
+    "lint": "eslint .",
+    "lint:fix": "eslint --ext .astro . --fix",
+    "start": "astro dev",
+    "preview": "astro build && astro preview",
+    "test": "pnpm run test:unit",
+    "test:unit": "vitest",
+    "update": "pnpm update --latest",
+    "upgrade": "pnpm dlx @astrojs/upgrade"
+  },
   "devDependencies": {
-    "astro": "^5.2.6"
+    "@semantic-release/git": "^10.0.1",
+    "@types/node": "^22.13.1",
+    "astro": "^5.2.6",
+    "semantic-release": "^24.2.2"
   },
   "peerDependencies": {
     "astro": "^4.0.0 || ^5.0.0"
