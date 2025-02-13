@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { astroCloudflarePagesHeaders } from "./integration";
+import astroCloudflarePagesHeaders from "./integration";
 
 describe("astro-cloudflarePagesHeaders integration", () => {
   let integration: ReturnType<typeof astroCloudflarePagesHeaders>;
@@ -90,6 +90,6 @@ describe("astro-cloudflarePagesHeaders integration", () => {
     await hooks["astro:build:done"]({ dir: buildDir, logger });
 
     expect(logger.error).toHaveBeenCalled();
-    expect(logger.error.mock.calls[0][0]).toContain("Failed to write _headers file");
-  });
+    expect(vi.mocked(logger.error).mock.calls[0][0]).toContain("Failed to write _headers file");
+  }); 
 });
