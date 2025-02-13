@@ -1,8 +1,6 @@
-// astro-cloudflare-pages-headers.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
-
 import astroCloudflarePagesHeaders from "./integration";
 
 describe("astro-cloudflarePagesHeaders integration", () => {
