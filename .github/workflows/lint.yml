@@ -1,15 +1,13 @@
 name: Lint
 
 on:
-  push:
-    branches:
-      - dev  # Only run on dev branch
-  pull_request:
-    branches:
-      - main  # Run on PRs into main
+  workflow_run:
+    workflows: ["Types"]
+    types: [completed]
 
 jobs:
   lint:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
