@@ -95,13 +95,13 @@ This configuration generates the following `_headers` file:
 
 ### Setup
 
-`astro:config:setup`:
+`astro:config:setup`
 
 The integration reads your header configuation from `config.server.headers` and stores it internally.
 
 ### Build
 
-`astro:build:done`:
+`astro:build:done`
 
 - If headers are configured, it converts them into the appropriate Cloudflare Pages format.
 - It writes the generated content to a `_headers` file in your build output directory.
@@ -128,6 +128,10 @@ pnpm test
 yarn test
 ```
 
+### Testing Your Header Configuration
+
+[MDN Observatory](https://observatory.mozilla.org/) is a great tool for testing your headers. You can use it to [test your headers locally](https://github.com/mdn/mdn-http-observatory/) or after deploying to Cloudflare Pages.
+
 ## Contributing
 
 Contributions and improvements are welcome. Feel free to open issues or submit pull requests on the repository.
@@ -146,5 +150,10 @@ This project is licensed under the [MIT License](https://opensource.org/license/
 - [Cloudflare Pages](https://pages.cloudflare.com/)
   - [Cloudflare Pages Documentation](https://developers.cloudflare.com/pages/)
   - [Customizing Headers](https://developers.cloudflare.com/pages/platform/headers)
+
+- [MDN Observatory](https://observatory.mozilla.org/)
+  - [mdn-http-observatory](https://github.com/mdn/mdn-http-observatory/)
+
 - [Vitest](https://vitest.dev/)
+  
 - [MIT License](https://opensource.org/licenses/MIT)
