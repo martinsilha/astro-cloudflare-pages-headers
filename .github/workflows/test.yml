@@ -1,13 +1,14 @@
-name: Lint
+name: Test
 on:
   workflow_run:
-    workflows: ["Types"]
-    types: [completed]
+    workflows: ["Lint"]
+    types:
+      - completed
 
 jobs:
-  lint:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  test:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -17,5 +18,5 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
-      - name: Run ESLint
-        run: npm run lint
+      - name: Run tests
+        run: npm test

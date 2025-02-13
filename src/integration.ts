@@ -1,13 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-
-import type { AstroConfig, AstroIntegrationLogger } from "astro";
+import type { HeadersFlat, HeadersNested, AstroHeaders, Routes } from "./types";
+import type { AstroIntegration } from "astro";
 
 const NAME = "astro-cloudflare-pages-headers";
-
-type HeadersFlat = Record<string, string>;
-type HeadersNested = Record<string, Record<string, string>>;
-type AstroHeaders = HeadersFlat | HeadersNested;
 
 // Helper function to check if an object is empty.
 const isEmptyObject = (obj: object): boolean => Object.keys(obj).length === 0;
@@ -19,7 +15,7 @@ function getBuildDir(dir: URL | string): string {
 
 // Helper function to generate the _headers file content.
 function generateHeadersContent(
-	routes: Record<string, Record<string, string>>,
+	routes: Routes,
 ): string {
 	const lines: string[] = [];
 	for (const [route, headers] of Object.entries(routes)) {
@@ -33,7 +29,7 @@ function generateHeadersContent(
 }
 
 // New helper to parse astroHeaders into a routes object.
-function parseHeaders(astroHeaders: AstroHeaders): Record<string, Record<string, string>> {
+function parseHeaders(astroHeaders: AstroHeaders): Routes {
 	const sampleValue = Object.values(astroHeaders)[0];
 	if (typeof sampleValue === "string") {
 		return { "/*": astroHeaders as HeadersFlat };
@@ -49,19 +45,13 @@ export default function astroCloudflarePagesHeaders() {
 	return {
 		name: "astroCloudflarePagesHeaders",
 		hooks: {
-			"astro:config:setup": ({
-				config,
-				logger,
-			}: { config: AstroConfig; logger: AstroIntegrationLogger }) => {
+			"astro:config:setup": ({ config, logger }: any) => {
 				logger.info(`[${NAME}] Setting up integration`);
 				if (config.server?.headers) {
 					astroHeaders = config.server.headers as AstroHeaders;
 				}
 			},
-			"astro:build:done": async ({
-				dir,
-				logger,
-			}: { dir: URL | string; logger: AstroIntegrationLogger }) => {
+			"astro:build:done": async ({ dir, logger }: any) => {
 				logger.info(`[${NAME}] Running build hook`);
 
 				if (
@@ -89,5 +79,5 @@ export default function astroCloudflarePagesHeaders() {
 				}
 			},
 		},
-	};
+	} as unknown as AstroIntegration;
 }
