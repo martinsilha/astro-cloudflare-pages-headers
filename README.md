@@ -3,9 +3,17 @@
 ![npm](https://img.shields.io/npm/v/astro-cloudflare-pages-headers)
 ![GitHub](https://img.shields.io/github/license/martinsilha/astro-cloudflare-pages-headers)
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/martinsilha/astro-cloudflare-pages-headers/release.yml)
+![GitHub Stars](https://img.shields.io/github/stars/martinsilha/astro-cloudflare-pages-headers?style=social)
+![npm downloads](https://img.shields.io/npm/dm/astro-cloudflare-pages-headers?style=social)
+
 ![GitHub Release Date](https://img.shields.io/github/release-date/martinsilha/astro-cloudflare-pages-headers)
 ![GitHub last commit](https://img.shields.io/github/last-commit/martinsilha/astro-cloudflare-pages-headers)
+
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/martinsilha/astro-cloudflare-pages-headers/types.yml?branch=main&label=types)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/martinsilha/astro-cloudflare-pages-headers/lint.yml?branch=main&label=lint)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/martinsilha/astro-cloudflare-pages-headers/test.yml?branch=main&label=test)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/martinsilha/astro-cloudflare-pages-headers/release.yml?branch=main&label=release)
+
 
 A lightweight [integration](https://astro.build/integrations/) for [Astro](https://astro.build/) that automatically generates a [Cloudflare Pages](https://pages.cloudflare.com/) `_headers` file for deployments based on your server header configuration.
 
