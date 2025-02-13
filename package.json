@@ -11,13 +11,6 @@
     "src",
     "index.ts"
   ],
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git@github.com:martinsilha/astro-cloudflare-pages-headers.git"
-  },
   "keywords": [
     "astro",
     "astro-component",
