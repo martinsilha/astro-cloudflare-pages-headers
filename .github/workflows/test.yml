@@ -3,8 +3,7 @@ name: Test
 on:
   workflow_run:
     workflows: ["Lint"]  # Run tests only if linting succeeds
-    types:
-      - completed
+    types: [completed]
     branches:
       - dev  # Only run on dev when linting is done
 
