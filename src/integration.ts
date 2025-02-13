@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { HeadersFlat, HeadersNested, AstroHeaders, Routes } from "./types";
-import type { AstroIntegration } from "astro";
+import type { AstroIntegration, AstroConfig, AstroIntegrationLogger } from "astro";
 
 const NAME = "astro-cloudflare-pages-headers";
 
@@ -45,13 +45,13 @@ export default function astroCloudflarePagesHeaders() {
 	return {
 		name: "astroCloudflarePagesHeaders",
 		hooks: {
-			"astro:config:setup": ({ config, logger }: { config: any; logger: any }) => {
+			"astro:config:setup": ({ config, logger }: { config: AstroConfig; logger: AstroIntegrationLogger }) => {
 				logger.info(`[${NAME}] Setting up integration`);
 				if (config.server?.headers) {
 					astroHeaders = config.server.headers as AstroHeaders;
 				}
 			},
-			"astro:build:done": async ({ dir, logger }: { dir: URL | string; logger: any }) => {
+			"astro:build:done": async ({ dir, logger }: { dir: URL | string; logger: AstroIntegrationLogger }) => {
 				logger.info(`[${NAME}] Running build hook`);
 
 				if (
