@@ -1,21 +1,27 @@
 name: Lint
+
 on:
-  workflow_run:
-    workflows: ["Types"]
-    types: [completed]
+  push:
+    branches:
+      - dev  # Only run on dev branch
+  pull_request:
+    branches:
+      - main  # Run on PRs into main
 
 jobs:
   lint:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - name: Install dependencies
         run: npm install
+
       - name: Run ESLint
         run: npm run lint
