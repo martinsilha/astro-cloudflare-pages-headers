@@ -1,6 +1,6 @@
 # astro-cloudflare-pages-headers
 
-A lightweight integration for [Astro](https://astro.build/) that automatically generates a [Cloudflare Pages](https://pages.cloudflare.com/) `_headers` file for deployments based on your server header configuration.
+A lightweight [integration](https://astro.build/integrations/) for [Astro](https://astro.build/) that automatically generates a [Cloudflare Pages](https://pages.cloudflare.com/) `_headers` file for deployments based on your server header configuration.
 
 ## Features
 
@@ -13,20 +13,20 @@ A lightweight integration for [Astro](https://astro.build/) that automatically g
 Install the integration via `npm`, `pnpm`, or `yarn`:
 
 ```bash
-npm install astro-cloudflare-pages-headers
+npm install astro-cloudflare-pages-headers --save-dev
 ```
 
 ```bash
-pnpm install astro-cloudflare-pages-headers
+pnpm install astro-cloudflare-pages-headers --save-dev
 ```
 
 ```bash
-yarn add astro-cloudflare-pages-headers
+yarn add astro-cloudflare-pages-headers --dev
 ```
 
 ## Usage
 
-Add the integration to your Astro configuration file (`astro.config.mjs`). The integration looks for header settings in the `server.headers` property:
+Add the integration to your [Astro configuration file](https://docs.astro.build/en/reference/configuration-reference/) (`astro.config.mjs`). The integration looks for [header settings](https://docs.astro.build/en/reference/configuration-reference/#serverheaders) in the `server.headers` property:
 
 ### Example with Flat Headers
 
@@ -135,3 +135,16 @@ Contributions and improvements are welcome. Feel free to open issues or submit p
 ## License
 
 This project is licensed under the [MIT License](https://opensource.org/license/mit). See the [LICENSE](LICENSE) file for details.
+
+## Resources
+
+- [Astro](https://astro.build/)
+  - [Configuration Reference](https://docs.astro.build/en/reference/configuration-reference/)
+  - [Server Headers](https://docs.astro.build/en/reference/configuration-reference/#serverheaders)
+  - [Integrations](https://docs.astro.build/en/guides/integrations-guide/)
+
+- [Cloudflare Pages](https://pages.cloudflare.com/)
+  - [Cloudflare Pages Documentation](https://developers.cloudflare.com/pages/)
+  - [Customizing Headers](https://developers.cloudflare.com/pages/platform/headers)
+- [Vitest](https://vitest.dev/)
+- [MIT License](https://opensource.org/licenses/MIT)
