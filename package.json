@@ -39,6 +39,7 @@
     "preview": "astro build && astro preview",
     "test": "pnpm run test:unit",
     "test:unit": "vitest",
+    "types": "tsc --noEmit",
     "update": "pnpm update --latest",
     "upgrade": "pnpm dlx @astrojs/upgrade"
   },
