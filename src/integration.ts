@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { HeadersFlat, HeadersNested, AstroHeaders, Routes } from "./types";
 import type { AstroIntegration, AstroConfig, AstroIntegrationLogger } from "astro";
 
@@ -8,9 +9,18 @@ const NAME = "astro-cloudflare-pages-headers";
 // Helper function to check if an object is empty.
 const isEmptyObject = (obj: object): boolean => Object.keys(obj).length === 0;
 
-// Helper function to convert the provided directory into a string path.
+// Updated helper function to convert the provided directory into a string path.
 function getBuildDir(dir: URL | string): string {
-	return typeof dir === "string" ? dir : path.resolve(dir.pathname);
+	if (typeof dir === "string") {
+		return path.resolve(dir);
+	}
+	const filePath = fileURLToPath(dir);
+	// If the resolved filePath is not under process.cwd(), treat it as relative
+	if (!filePath.startsWith(process.cwd())) {
+		// Remove the leading "/" and resolve relative to process.cwd()
+		return path.resolve(process.cwd(), filePath.substring(1));
+	}
+	return filePath;
 }
 
 // Helper function to generate the _headers file content.

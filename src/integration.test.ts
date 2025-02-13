@@ -41,7 +41,7 @@ describe("astro-cloudflarePagesHeaders integration", () => {
       pages: [],
       routes: [],
       assets: new Map(),
-      dir: new URL(buildDir),
+      dir: new URL(buildDir, "file:///"),
       logger,
     });
 
@@ -74,7 +74,7 @@ describe("astro-cloudflarePagesHeaders integration", () => {
       pages: [],
       routes: [],
       assets: new Map(),
-      dir: new URL(buildDir),
+      dir: new URL(buildDir, "file:///"),
       logger,
     });
 
@@ -110,7 +110,7 @@ describe("astro-cloudflarePagesHeaders integration", () => {
       pages: [],
       routes: [],
       assets: new Map(),
-      dir: new URL(buildDir),
+      dir: new URL(buildDir, "file:///"),
       logger,
     });
 
@@ -148,7 +148,7 @@ describe("astro-cloudflarePagesHeaders integration", () => {
       pages: [],
       routes: [],
       assets: new Map(),
-      dir: new URL(buildDir),
+      dir: new URL(buildDir, "file:///"),
       logger,
     });
 
