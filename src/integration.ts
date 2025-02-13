@@ -43,7 +43,7 @@ function parseHeaders(astroHeaders: AstroHeaders): Record<string, Record<string,
 
 // Export an integration function.
 // When called, it returns an object containing hooks with a scoped astroHeaders variable.
-export function astroCloudflarePagesHeaders() {
+export default function astroCloudflarePagesHeaders() {
 	let astroHeaders: AstroHeaders | undefined;
 
 	return {
