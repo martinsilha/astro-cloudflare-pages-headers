@@ -10,7 +10,7 @@ export default [
   // 1. Base language options
   {
     files: ['**/*.{js,ts,astro}'],
-    ignores: ['node_modules/**', 'dist/**', './demo', '*.test.js', '*.test.ts'],
+    ignores: ['node_modules/**', 'dist/**', './demo', '**/*.test.js', '**/*.test.ts'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
