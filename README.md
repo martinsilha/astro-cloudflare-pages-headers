@@ -7,7 +7,6 @@
 ![GitHub Release Date](https://img.shields.io/github/release-date/martinsilha/astro-cloudflare-pages-headers)
 ![GitHub last commit](https://img.shields.io/github/last-commit/martinsilha/astro-cloudflare-pages-headers)
 
-
 A lightweight [integration](https://astro.build/integrations/) for [Astro](https://astro.build/) that automatically generates a [Cloudflare Pages](https://pages.cloudflare.com/) `_headers` file for deployments based on your server header configuration.
 
 ## Features
