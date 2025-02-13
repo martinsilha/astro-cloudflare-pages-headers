@@ -16,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/martinsilha/astro-cloudflare-pages-headers.git"
+    "url": "git@github.com:martinsilha/astro-cloudflare-pages-headers.git"
   },
   "keywords": [
     "astro",
