@@ -4,14 +4,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import astroCloudflarePagesHeaders from "./integration";
+import type { AstroIntegration } from "astro";
 
 describe("astro-cloudflarePagesHeaders integration", () => {
   let integration: ReturnType<typeof astroCloudflarePagesHeaders>;
-  let hooks: Record<string, any>;
+  let hooks: AstroIntegration["hooks"];
   let logger: {
-    info: (...args: any[]) => void;
-    warn: (...args: any[]) => void;
-    error: (...args: any[]) => void;
+    info: (...args: unknown[]) => void;
+    warn: (...args: unknown[]) => void;
+    error: (...args: unknown[]) => void;
   };
   let writeFileSpy: ReturnType<typeof vi.spyOn>;
 
