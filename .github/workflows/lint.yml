@@ -11,6 +11,6 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: pnpm install
+        run: npm install
       - name: Run ESLint
-        run: pnpm run lint
+        run: npm run lint
