@@ -1,12 +1,7 @@
-name: Lint
-on:
-  workflow_run:
-    workflows: ["Types"]
-    types: [completed]
-
+name: Types
+on: [push, pull_request]
 jobs:
-  lint:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  type-check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -17,5 +12,5 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
-      - name: Run ESLint
-        run: npm run lint
+      - name: Run TypeScript Compiler
+        run: npm run types
