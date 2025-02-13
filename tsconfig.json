@@ -10,6 +10,9 @@
     "node_modules"
   ],
   "compilerOptions": {
+    "module": "ESNext",
+    "target": "ES2020",
+    "moduleResolution": "node",
     "jsx": "preserve"
   }
 }
