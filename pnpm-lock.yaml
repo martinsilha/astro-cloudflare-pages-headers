@@ -46,15 +46,6 @@ importers:
         specifier: ^3.0.5
         version: 3.0.5(@types/debug@4.1.12)(@types/node@22.13.1)(yaml@2.7.0)
 
-  demo:
-    dependencies:
-      astro:
-        specifier: ^5.2.6
-        version: 5.2.6(@types/node@22.13.1)(rollup@4.34.6)(typescript@5.7.3)(yaml@2.7.0)
-      astro-cloudflare-pages-headers:
-        specifier: ^1.6.1
-        version: 1.6.1(astro@5.2.6(@types/node@22.13.1)(rollup@4.34.6)(typescript@5.7.3)(yaml@2.7.0))
-
 packages:
 
   '@astrojs/check@0.9.4':
@@ -480,8 +471,8 @@ packages:
     resolution: {integrity: sha512-z+j7DixNnfpdToYsOutStDgeRzJSMnbj8T1C/oQjB6Aa+kRfNjs/Fn7W6c8bmlt6mfy3FkgeKBRnDjxQow5dow==}
     engines: {node: '>= 18'}
 
-  '@octokit/endpoint@10.1.2':
-    resolution: {integrity: sha512-XybpFv9Ms4hX5OCHMZqyODYqGTZ3H6K6Vva+M9LR7ib/xr1y1ZnlChYv9H680y77Vd/i/k+thXApeRASBQkzhA==}
+  '@octokit/endpoint@10.1.3':
+    resolution: {integrity: sha512-nBRBMpKPhQUxCsQQeW+rCJ/OPSMcj3g0nfHn01zGYZXuNDvvXudF/TYY6APj5THlurerpFN4a/dQAIAaM6BYhA==}
     engines: {node: '>= 18'}
 
   '@octokit/graphql@8.2.0':
@@ -972,11 +963,6 @@ packages:
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
     engines: {node: '>=12'}
-
-  astro-cloudflare-pages-headers@1.6.1:
-    resolution: {integrity: sha512-bgJEeBScjuB6MhK54w/9YNMxie4T6YjAQRTUVYOUUf4kpMolMyGXr/qP4k/lI1XJ+iwKAigEHNkgJWFYLMAMzg==}
-    peerDependencies:
-      astro: ^4.0.0 || ^5.0.0
 
   astro-eslint-parser@1.2.1:
     resolution: {integrity: sha512-3oqANMjrvJ+IE5pwlUWsH/4UztmYf/GTL0HPUkWnYBNAHiGVGrOh2EbegxS5niAwlO0w9dRYk0CkCPlJcu8c3Q==}
@@ -4075,7 +4061,7 @@ snapshots:
       before-after-hook: 3.0.2
       universal-user-agent: 7.0.2
 
-  '@octokit/endpoint@10.1.2':
+  '@octokit/endpoint@10.1.3':
     dependencies:
       '@octokit/types': 13.8.0
       universal-user-agent: 7.0.2
@@ -4112,7 +4098,7 @@ snapshots:
 
   '@octokit/request@9.2.0':
     dependencies:
-      '@octokit/endpoint': 10.1.2
+      '@octokit/endpoint': 10.1.3
       '@octokit/request-error': 6.1.6
       '@octokit/types': 13.8.0
       fast-content-type-parse: 2.0.1
@@ -4663,15 +4649,6 @@ snapshots:
       is-array-buffer: 3.0.5
 
   assertion-error@2.0.1: {}
-
-  astro-cloudflare-pages-headers@1.6.1(astro@5.2.6(@types/node@22.13.1)(rollup@4.34.6)(typescript@5.7.3)(yaml@2.7.0)):
-    dependencies:
-      '@astrojs/check': 0.9.4(typescript@5.7.3)
-      astro: 5.2.6(@types/node@22.13.1)(rollup@4.34.6)(typescript@5.7.3)(yaml@2.7.0)
-      typescript: 5.7.3
-    transitivePeerDependencies:
-      - prettier
-      - prettier-plugin-astro
 
   astro-eslint-parser@1.2.1:
     dependencies:
