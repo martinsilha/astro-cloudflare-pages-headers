@@ -14,7 +14,6 @@
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/martinsilha/astro-cloudflare-pages-headers/test.yml?branch=main&label=test)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/martinsilha/astro-cloudflare-pages-headers/release.yml?branch=main&label=release)
 
-
 A lightweight [integration](https://astro.build/integrations/) for [Astro](https://astro.build/) that automatically generates a [Cloudflare Pages](https://pages.cloudflare.com/) `_headers` file for deployments based on your server header configuration.
 
 ## Features
@@ -25,18 +24,10 @@ A lightweight [integration](https://astro.build/integrations/) for [Astro](https
 
 ## Installation
 
-Install the integration via `npm`, `pnpm`, or `yarn`:
+Install the integration via the `astro add` command:
 
 ```bash
-npm install astro-cloudflare-pages-headers --save-dev
-```
-
-```bash
-pnpm install astro-cloudflare-pages-headers --save-dev
-```
-
-```bash
-yarn add astro-cloudflare-pages-headers --dev
+astro add astro-cloudflare-pages-headers
 ```
 
 ## Usage
