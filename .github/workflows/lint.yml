@@ -8,6 +8,7 @@ on:
 jobs:
   lint:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    timeout-minutes: 3
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
