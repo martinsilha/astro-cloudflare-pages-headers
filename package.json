@@ -37,22 +37,22 @@
     "upgrade": "pnpm dlx @astrojs/upgrade"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.0",
+    "@eslint/eslintrc": "^3.3.1",
     "@semantic-release/git": "^10.0.1",
-    "@types/node": "^22.13.10",
-    "@typescript-eslint/eslint-plugin": "^8.26.1",
-    "@typescript-eslint/parser": "^8.26.1",
-    "astro": "^5.6.2",
-    "astro-eslint-parser": "^1.2.1",
+    "@types/node": "^22.15.2",
+    "@typescript-eslint/eslint-plugin": "^8.31.0",
+    "@typescript-eslint/parser": "^8.31.0",
+    "astro": "^5.7.5",
+    "astro-eslint-parser": "^1.2.2",
     "eslint-plugin-import": "^2.31.0",
     "semantic-release": "^24.2.3",
-    "vitest": "^3.0.8"
+    "vitest": "^3.1.2"
   },
   "peerDependencies": {
     "astro": "^4.0.0 || ^5.0.0"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.3"
   }
 }
