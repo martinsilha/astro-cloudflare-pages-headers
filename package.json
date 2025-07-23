@@ -39,14 +39,14 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@semantic-release/git": "^10.0.1",
-    "@types/node": "^22.15.21",
-    "@typescript-eslint/eslint-plugin": "^8.32.1",
-    "@typescript-eslint/parser": "^8.32.1",
-    "astro": "^5.8.0",
+    "@types/node": "^22.16.5",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "astro": "^5.12.3",
     "astro-eslint-parser": "^1.2.2",
-    "eslint-plugin-import": "^2.31.0",
-    "semantic-release": "^24.2.4",
-    "vitest": "^3.1.4"
+    "eslint-plugin-import": "^2.32.0",
+    "semantic-release": "^24.2.7",
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
     "astro": "^4.0.0 || ^5.0.0"
