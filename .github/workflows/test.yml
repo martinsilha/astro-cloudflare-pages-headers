@@ -1,13 +1,9 @@
 name: Test
 
 on:
-  workflow_run:
-    workflows: ["Lint"]  # Run tests only if linting succeeds
-    types: [completed]
-
   pull_request:
     branches:
-      - main  # Run on PRs into main
+      - main
 
 jobs:
   test:
@@ -15,10 +11,10 @@ jobs:
     timeout-minutes: 3
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
 
