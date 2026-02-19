@@ -90,10 +90,7 @@ function resolveCspOptions(
 
 	return {
 		...merged,
-		mode:
-			merged.mode === "route" || merged.mode === "per-route"
-				? "route"
-				: "global",
+		mode: merged.mode === "route" ? "route" : "global",
 		maxHeaderLineLength:
 			Number.isFinite(merged.maxHeaderLineLength) &&
 			(merged.maxHeaderLineLength ?? 0) > 0
@@ -435,6 +432,32 @@ function findHeaderKey(
 	return undefined;
 }
 
+function patchDirectiveSources(
+	parsed: ParsedCspDirectives,
+	directiveName: string,
+	additionalSources: string[],
+	cspOptions: ResolvedCspOptions,
+	{
+		defaultSources = "'self'",
+	}: {
+		defaultSources?: string;
+	} = {},
+): boolean {
+	const currentSources = splitCspSources(
+		parsed.directives.get(directiveName) ?? defaultSources,
+	);
+	const nextSources = mergeCspSources(currentSources, additionalSources, {
+		stripUnsafeInline: cspOptions.stripUnsafeInline,
+	});
+
+	if (parsed.directives.get(directiveName) !== nextSources) {
+		parsed.directives.set(directiveName, nextSources);
+		return true;
+	}
+
+	return false;
+}
+
 function patchCspValue(
 	rawCspValue: string,
 	sources: CspHashSources,
@@ -445,50 +468,53 @@ function patchCspValue(
 	let changed = false;
 
 	if (cspOptions.hashStyleElements && sources.styleElementSources.length > 0) {
-		const currentStyleSources = splitCspSources(
-			parsed.directives.get("style-src") ?? "'self'",
-		);
-		const nextStyleSources = mergeCspSources(
-			currentStyleSources,
-			sources.styleElementSources,
-			{ stripUnsafeInline: cspOptions.stripUnsafeInline },
-		);
+		changed =
+			patchDirectiveSources(
+				parsed,
+				"style-src",
+				sources.styleElementSources,
+				cspOptions,
+			) || changed;
 
-		if (parsed.directives.get("style-src") !== nextStyleSources) {
-			parsed.directives.set("style-src", nextStyleSources);
-			changed = true;
+		if (parsed.directives.has("style-src-elem")) {
+			changed =
+				patchDirectiveSources(
+					parsed,
+					"style-src-elem",
+					sources.styleElementSources,
+					cspOptions,
+				) || changed;
 		}
 	}
 
 	if (cspOptions.hashStyleAttributes && sources.styleAttributeSources.length > 0) {
-		const currentStyleAttributeSources = splitCspSources(
-			parsed.directives.get("style-src-attr") ?? "",
-		);
-		const nextStyleAttributeSources = mergeCspSources(
-			currentStyleAttributeSources,
-			["'unsafe-hashes'", ...sources.styleAttributeSources],
-			{ stripUnsafeInline: cspOptions.stripUnsafeInline },
-		);
-
-		if (parsed.directives.get("style-src-attr") !== nextStyleAttributeSources) {
-			parsed.directives.set("style-src-attr", nextStyleAttributeSources);
-			changed = true;
-		}
+		changed =
+			patchDirectiveSources(
+				parsed,
+				"style-src-attr",
+				["'unsafe-hashes'", ...sources.styleAttributeSources],
+				cspOptions,
+				{ defaultSources: "" },
+			) || changed;
 	}
 
 	if (cspOptions.hashInlineScripts && sources.scriptElementSources.length > 0) {
-		const currentScriptSources = splitCspSources(
-			parsed.directives.get("script-src") ?? "'self'",
-		);
-		const nextScriptSources = mergeCspSources(
-			currentScriptSources,
-			sources.scriptElementSources,
-			{ stripUnsafeInline: cspOptions.stripUnsafeInline },
-		);
+		changed =
+			patchDirectiveSources(
+				parsed,
+				"script-src",
+				sources.scriptElementSources,
+				cspOptions,
+			) || changed;
 
-		if (parsed.directives.get("script-src") !== nextScriptSources) {
-			parsed.directives.set("script-src", nextScriptSources);
-			changed = true;
+		if (parsed.directives.has("script-src-elem")) {
+			changed =
+				patchDirectiveSources(
+					parsed,
+					"script-src-elem",
+					sources.scriptElementSources,
+					cspOptions,
+				) || changed;
 		}
 	}
 
@@ -619,6 +645,17 @@ async function patchRoutesCsp(
 			targetHeaders[template.headerKey] = nextValue;
 			routes[targetRouteKey] = targetHeaders;
 			updatedCspHeaders += 1;
+		}
+
+		if (hasAnyCspSources(routeHashes.totals)) {
+			for (const wildcardRoute of wildcardRoutes) {
+				const currentValue = wildcardRoute.headers[wildcardRoute.headerKey];
+				const nextValue = patchCspValue(currentValue, routeHashes.totals, cspOptions);
+				if (nextValue !== currentValue) {
+					wildcardRoute.headers[wildcardRoute.headerKey] = nextValue;
+					updatedCspHeaders += 1;
+				}
+			}
 		}
 
 		return {

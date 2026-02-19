@@ -241,6 +241,53 @@ describe("astro-cloudflarePagesHeaders integration", () => {
 		).toBe(true);
 	});
 
+	it("should patch script-src-elem and style-src-elem directives when present", async () => {
+		setIntegration({
+			csp: {
+				autoHashes: true,
+				hashInlineScripts: true,
+			},
+		});
+
+		const styleContent = "body{color:red}";
+		const scriptContent = "console.log('elem')";
+		const html = `<style>${styleContent}</style><script>${scriptContent}</script>`;
+		const buildDirPath = path.resolve("buildDir");
+		const htmlPath = path.resolve(buildDirPath, "index.html");
+
+		vi.spyOn(fs, "readdir").mockImplementation(async (directoryPath) => {
+			if (path.resolve(String(directoryPath)) === buildDirPath) {
+				return [createDirent("index.html", "file")] as any;
+			}
+			return [] as any;
+		});
+
+		vi.spyOn(fs, "readFile").mockImplementation(async (filePath) => {
+			if (path.resolve(String(filePath)) === htmlPath) {
+				return html as any;
+			}
+			return "" as any;
+		});
+
+		configureHeaders({
+			"/test": {
+				"Content-Security-Policy":
+					"default-src 'self'; style-src-elem 'self' 'unsafe-inline'; script-src-elem 'self' 'unsafe-inline'",
+			},
+		});
+
+		await runBuildDone();
+
+		const styleHash = hashSha256(styleContent);
+		const scriptHash = hashSha256(scriptContent);
+		const writtenHeaders = writeFileSpy.mock.calls[0][1] as string;
+
+		expect(writtenHeaders).toContain(`style-src-elem 'self' '${styleHash}'`);
+		expect(writtenHeaders).toContain(`script-src-elem 'self' '${scriptHash}'`);
+		expect(writtenHeaders).not.toContain("style-src-elem 'self' 'unsafe-inline'");
+		expect(writtenHeaders).not.toContain("script-src-elem 'self' 'unsafe-inline'");
+	});
+
 	it("should patch CSP hashes per HTML route when csp.mode is route", async () => {
 		setIntegration({
 			csp: {
@@ -300,8 +347,17 @@ describe("astro-cloudflarePagesHeaders integration", () => {
 		const writtenHeaders = writeFileSpy.mock.calls[0][1] as string;
 		const parsedHeaders = parseGeneratedHeaders(writtenHeaders);
 
-		expect(parsedHeaders["/*"]["Content-Security-Policy"]).toBe(
-			"default-src 'self'; style-src 'self'; script-src 'self';",
+		expect(parsedHeaders["/*"]["Content-Security-Policy"]).toContain(
+			`'${rootStyleHash}'`,
+		);
+		expect(parsedHeaders["/*"]["Content-Security-Policy"]).toContain(
+			`'${aboutStyleHash}'`,
+		);
+		expect(parsedHeaders["/*"]["Content-Security-Policy"]).toContain(
+			`'${rootScriptHash}'`,
+		);
+		expect(parsedHeaders["/*"]["Content-Security-Policy"]).toContain(
+			`'${aboutScriptHash}'`,
 		);
 		expect(parsedHeaders["/*"]["X-Test"]).toBe("value");
 

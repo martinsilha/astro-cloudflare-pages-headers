@@ -10,7 +10,7 @@ export interface CspAutoHashesOptions {
 	hashStyleAttributes?: boolean;
 	hashInlineScripts?: boolean;
 	stripUnsafeInline?: boolean;
-	mode?: "global" | "route" | "per-route";
+	mode?: "global" | "route";
 	maxHeaderLineLength?: number;
 	overflow?: "error" | "warn";
 }
