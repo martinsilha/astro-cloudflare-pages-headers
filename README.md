@@ -20,7 +20,9 @@ A lightweight [integration](https://astro.build/integrations/) for [Astro](https
 
 - Automatic `_headers` generation: Reads header settings from your `astro.config.mjs` and generates a `_headers` file during build.
 - Flexible configuration: Supports both flat and nested header formats.
-- Informative logging: Provides useful log messages during setup and build
+- Workers wildcard normalization: Optionally remaps a universal `*` route to `/*` in generated `_headers`.
+- Optional CSP auto-hashes: Can scan built HTML and append CSP hashes for inline styles, style attributes, and optionally inline scripts.
+- Informative logging: Provides useful log messages during setup and build.
 
 ## Installation
 
@@ -40,7 +42,7 @@ Add the integration to your [Astro configuration file](https://docs.astro.build/
 
 ```js,ts
 import { defineConfig } from 'astro/config';
-import { astroCloudflarePagesHeaders } from 'astro-cloudflare-pages-headers';
+import astroCloudflarePagesHeaders from 'astro-cloudflare-pages-headers';
 
 export default defineConfig({
   integrations: [
@@ -63,12 +65,71 @@ This configuration generates the following `_headers` file:
   X-Another-Header: another-value
 ```
 
+### Optional CSP Auto-Hashing
+
+If you use CSP integrations (for example `astro-shield`) and want inline hashes added automatically, enable the optional CSP pass:
+
+```js,ts
+import { defineConfig } from 'astro/config';
+import astroCloudflarePagesHeaders from 'astro-cloudflare-pages-headers';
+
+export default defineConfig({
+  integrations: [
+    astroCloudflarePagesHeaders({
+      csp: {
+        autoHashes: true,
+        hashStyleElements: true,
+        hashStyleAttributes: true,
+        hashInlineScripts: false,
+        stripUnsafeInline: true,
+      },
+    }),
+  ],
+});
+```
+
+`csp` options:
+
+- `autoHashes` (default: `false`): Enables post-build CSP patching.
+- `hashStyleElements` (default: `true`): Adds hashes for inline `<style>` blocks.
+- `hashStyleAttributes` (default: `true`): Adds hashes for `style=""` attributes (via `style-src-attr` + `'unsafe-hashes'`).
+- `hashInlineScripts` (default: `false`): Adds hashes for inline `<script>` blocks.
+- `stripUnsafeInline` (default: `true`): Removes `'unsafe-inline'` from patched directives when hashes are injected.
+
+By default (`autoHashes: false`), behavior is unchanged from previous versions.
+
+### Workers Mode
+
+If you want to keep `server.headers` using a universal `*` route (which is often convenient in dev), enable workers mode to normalize it to `/*` in generated `_headers`:
+
+```js,ts
+import { defineConfig } from 'astro/config';
+import astroCloudflarePagesHeaders from 'astro-cloudflare-pages-headers';
+
+export default defineConfig({
+  integrations: [
+    astroCloudflarePagesHeaders({
+      workers: true,
+    }),
+  ],
+  server: {
+    headers: {
+      '*': {
+        'X-Frame-Options': 'DENY',
+      },
+    },
+  },
+});
+```
+
+With `workers: true`, the generated `_headers` route becomes `/*`.
+
 ### Example with Nested Headers
 
 `astro.config.mjs`:
 ```js,ts
 import { defineConfig } from 'astro/config';
-import { astroCloudflarePagesHeaders } from 'astro-cloudflare-pages-headers';
+import astroCloudflarePagesHeaders from 'astro-cloudflare-pages-headers';
 
 export default defineConfig({
   integrations: [
@@ -110,6 +171,8 @@ The integration reads your header configuation from `config.server.headers` and 
 `astro:build:done`
 
 - If headers are configured, it converts them into the appropriate Cloudflare Pages format.
+- If `workers: true` is enabled, a universal `*` route is normalized to `/*` before writing `_headers`.
+- If `csp.autoHashes` is enabled, it scans generated HTML and patches `Content-Security-Policy` header directives with hash sources.
 - It writes the generated content to a `_headers` file in your build output directory.
 - Logs inform you if the file is successfully written or if any errors occur.
 - If no headers are configured, it logs a warning and skips file generation.

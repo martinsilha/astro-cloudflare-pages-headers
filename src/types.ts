@@ -4,6 +4,19 @@ export type AstroHeaders = HeadersFlat | HeadersNested;
 
 export type Routes = Record<string, Record<string, string>>;
 
+export interface CspAutoHashesOptions {
+	autoHashes?: boolean;
+	hashStyleElements?: boolean;
+	hashStyleAttributes?: boolean;
+	hashInlineScripts?: boolean;
+	stripUnsafeInline?: boolean;
+}
+
+export interface AstroCloudflarePagesHeadersOptions {
+	workers?: boolean;
+	csp?: CspAutoHashesOptions;
+}
+
 export interface AstroConfig {
 	server?: {
 		headers?: AstroHeaders;
