@@ -2,7 +2,7 @@
     "name": "astro-cloudflare-pages-headers",
     "homepage": "https://github.com/martinsilha/astro-cloudflare-pages-headers",
     "description": "A lightweight integration for Astro that automatically generates a Cloudflare Pages _headers file for deployments based on your server header configuration.",
-    "version": "1.7.0",
+    "version": "1.7.1",
     "type": "module",
     "exports": {
         ".": "./index.ts"
