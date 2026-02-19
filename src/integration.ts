@@ -32,11 +32,33 @@ interface CspHashSources {
 	inlineScriptHashes: number;
 }
 
+interface CspHashSets {
+	styleElementHashes: Set<string>;
+	styleAttributeHashes: Set<string>;
+	scriptElementHashes: Set<string>;
+}
+
 interface CspHashReport {
 	inlineStyleHashes: number;
 	styleAttributeHashes: number;
 	inlineScriptHashes: number;
 	updatedCspHeaders: number;
+}
+
+interface CspRouteHashes {
+	sourcesByRoute: Map<string, CspHashSources>;
+	totals: CspHashSources;
+}
+
+interface CspRoute {
+	route: string;
+	headers: Record<string, string>;
+	headerKey: string;
+}
+
+interface WildcardCspRoute extends CspRoute {
+	pattern: RegExp;
+	originalOrder: number;
 }
 
 interface ParsedCspDirectives {
@@ -50,6 +72,9 @@ const DEFAULT_CSP_OPTIONS: ResolvedCspOptions = {
 	hashStyleAttributes: true,
 	hashInlineScripts: false,
 	stripUnsafeInline: true,
+	mode: "global",
+	maxHeaderLineLength: 2000,
+	overflow: "error",
 };
 
 // Helper function to check if an object is empty.
@@ -58,9 +83,23 @@ const isEmptyObject = (obj: object): boolean => Object.keys(obj).length === 0;
 function resolveCspOptions(
 	options: AstroCloudflarePagesHeadersOptions,
 ): ResolvedCspOptions {
-	return {
+	const merged = {
 		...DEFAULT_CSP_OPTIONS,
 		...(options.csp ?? {}),
+	};
+
+	return {
+		...merged,
+		mode:
+			merged.mode === "route" || merged.mode === "per-route"
+				? "route"
+				: "global",
+		maxHeaderLineLength:
+			Number.isFinite(merged.maxHeaderLineLength) &&
+			(merged.maxHeaderLineLength ?? 0) > 0
+				? Math.floor(merged.maxHeaderLineLength)
+				: DEFAULT_CSP_OPTIONS.maxHeaderLineLength,
+		overflow: merged.overflow === "warn" ? "warn" : "error",
 	};
 }
 
@@ -184,6 +223,110 @@ function quoteAndSortHashes(hashes: Set<string>): string[] {
 		.map((hash) => `'${hash}'`);
 }
 
+function createEmptyCspHashSets(): CspHashSets {
+	return {
+		styleElementHashes: new Set<string>(),
+		styleAttributeHashes: new Set<string>(),
+		scriptElementHashes: new Set<string>(),
+	};
+}
+
+function mergeCspHashSets(target: CspHashSets, source: CspHashSets): void {
+	for (const hash of source.styleElementHashes) {
+		target.styleElementHashes.add(hash);
+	}
+	for (const hash of source.styleAttributeHashes) {
+		target.styleAttributeHashes.add(hash);
+	}
+	for (const hash of source.scriptElementHashes) {
+		target.scriptElementHashes.add(hash);
+	}
+}
+
+function buildCspHashSources(hashSets: CspHashSets): CspHashSources {
+	return {
+		styleElementSources: quoteAndSortHashes(hashSets.styleElementHashes),
+		styleAttributeSources: quoteAndSortHashes(hashSets.styleAttributeHashes),
+		scriptElementSources: quoteAndSortHashes(hashSets.scriptElementHashes),
+		inlineStyleHashes: hashSets.styleElementHashes.size,
+		styleAttributeHashes: hashSets.styleAttributeHashes.size,
+		inlineScriptHashes: hashSets.scriptElementHashes.size,
+	};
+}
+
+function hasAnyCspSources(sources: CspHashSources): boolean {
+	return (
+		sources.styleElementSources.length > 0 ||
+		sources.styleAttributeSources.length > 0 ||
+		sources.scriptElementSources.length > 0
+	);
+}
+
+function collectCspHashesFromHtml(
+	html: string,
+	cspOptions: ResolvedCspOptions,
+): CspHashSets {
+	const hashSets = createEmptyCspHashSets();
+
+	if (cspOptions.hashStyleElements) {
+		STYLE_TAG_REGEX.lastIndex = 0;
+		for (const match of html.matchAll(STYLE_TAG_REGEX)) {
+			const attrs = match[1] ?? "";
+			const content = match[2] ?? "";
+			const integrityHash = attrs.match(INTEGRITY_HASH_REGEX)?.[1];
+
+			if (integrityHash) {
+				hashSets.styleElementHashes.add(integrityHash);
+			} else if (content.length > 0) {
+				hashSets.styleElementHashes.add(hashSha256(content));
+			}
+		}
+	}
+
+	if (cspOptions.hashInlineScripts) {
+		SCRIPT_TAG_REGEX.lastIndex = 0;
+		for (const match of html.matchAll(SCRIPT_TAG_REGEX)) {
+			const attrs = match[1] ?? "";
+			const content = match[2] ?? "";
+			const integrityHash = attrs.match(INTEGRITY_HASH_REGEX)?.[1];
+
+			if (HAS_SCRIPT_SRC_REGEX.test(attrs)) {
+				continue;
+			}
+
+			if (integrityHash) {
+				hashSets.scriptElementHashes.add(integrityHash);
+			} else if (content.trim()) {
+				hashSets.scriptElementHashes.add(hashSha256(content));
+			}
+		}
+	}
+
+	if (cspOptions.hashStyleAttributes) {
+		STYLE_ATTR_REGEX.lastIndex = 0;
+		for (const match of html.matchAll(STYLE_ATTR_REGEX)) {
+			const rawValue =
+				match[1] ??
+				match[2] ??
+				match[3] ??
+				"";
+
+			if (!rawValue) {
+				continue;
+			}
+
+			hashSets.styleAttributeHashes.add(hashSha256(rawValue));
+
+			const decodedValue = decodeHtmlEntities(rawValue);
+			if (decodedValue !== rawValue) {
+				hashSets.styleAttributeHashes.add(hashSha256(decodedValue));
+			}
+		}
+	}
+
+	return hashSets;
+}
+
 async function collectHtmlFiles(rootDir: string): Promise<string[]> {
 	const htmlFiles: string[] = [];
 
@@ -208,82 +351,74 @@ async function collectHtmlFiles(rootDir: string): Promise<string[]> {
 	return htmlFiles;
 }
 
+function mapHtmlFileToRoute(buildDir: string, htmlFile: string): string {
+	const relativePath = path.relative(buildDir, htmlFile)
+		.split(path.sep)
+		.join("/");
+
+	if (relativePath === "index.html") {
+		return "/";
+	}
+
+	if (relativePath.endsWith("/index.html")) {
+		const routePath = relativePath.slice(0, -"/index.html".length);
+		return `/${routePath}/`;
+	}
+
+	if (relativePath.endsWith(".html")) {
+		return `/${relativePath.slice(0, -".html".length)}`;
+	}
+
+	return `/${relativePath}`;
+}
+
 async function collectCspHashesFromBuild(
 	buildDir: string,
 	cspOptions: ResolvedCspOptions,
 ): Promise<CspHashSources> {
-	const inlineStyleHashes = new Set<string>();
-	const inlineScriptHashes = new Set<string>();
-	const styleAttributeHashes = new Set<string>();
+	const mergedHashSets = createEmptyCspHashSets();
 	const htmlFiles = await collectHtmlFiles(buildDir);
 
 	for (const htmlFile of htmlFiles) {
 		const html = await fs.readFile(htmlFile, "utf8");
+		const fileHashSets = collectCspHashesFromHtml(html, cspOptions);
+		mergeCspHashSets(mergedHashSets, fileHashSets);
+	}
 
-		if (cspOptions.hashStyleElements) {
-			STYLE_TAG_REGEX.lastIndex = 0;
-			for (const match of html.matchAll(STYLE_TAG_REGEX)) {
-				const attrs = match[1] ?? "";
-				const content = match[2] ?? "";
-				const integrityHash = attrs.match(INTEGRITY_HASH_REGEX)?.[1];
+	return buildCspHashSources(mergedHashSets);
+}
 
-				if (integrityHash) {
-					inlineStyleHashes.add(integrityHash);
-				} else if (content.length > 0) {
-					inlineStyleHashes.add(hashSha256(content));
-				}
-			}
+async function collectCspHashesByRouteFromBuild(
+	buildDir: string,
+	cspOptions: ResolvedCspOptions,
+): Promise<CspRouteHashes> {
+	const hashSetsByRoute = new Map<string, CspHashSets>();
+	const totals = createEmptyCspHashSets();
+	const htmlFiles = await collectHtmlFiles(buildDir);
+
+	for (const htmlFile of htmlFiles) {
+		const html = await fs.readFile(htmlFile, "utf8");
+		const route = mapHtmlFileToRoute(buildDir, htmlFile);
+		const fileHashSets = collectCspHashesFromHtml(html, cspOptions);
+		const existingHashSets = hashSetsByRoute.get(route);
+
+		if (existingHashSets) {
+			mergeCspHashSets(existingHashSets, fileHashSets);
+		} else {
+			hashSetsByRoute.set(route, fileHashSets);
 		}
 
-		if (cspOptions.hashInlineScripts) {
-			SCRIPT_TAG_REGEX.lastIndex = 0;
-			for (const match of html.matchAll(SCRIPT_TAG_REGEX)) {
-				const attrs = match[1] ?? "";
-				const content = match[2] ?? "";
-				const integrityHash = attrs.match(INTEGRITY_HASH_REGEX)?.[1];
+		mergeCspHashSets(totals, fileHashSets);
+	}
 
-				if (HAS_SCRIPT_SRC_REGEX.test(attrs)) {
-					continue;
-				}
-
-				if (integrityHash) {
-					inlineScriptHashes.add(integrityHash);
-				} else if (content.trim()) {
-					inlineScriptHashes.add(hashSha256(content));
-				}
-			}
-		}
-
-		if (cspOptions.hashStyleAttributes) {
-			STYLE_ATTR_REGEX.lastIndex = 0;
-			for (const match of html.matchAll(STYLE_ATTR_REGEX)) {
-				const rawValue =
-					match[1] ??
-					match[2] ??
-					match[3] ??
-					"";
-
-				if (!rawValue) {
-					continue;
-				}
-
-				styleAttributeHashes.add(hashSha256(rawValue));
-
-				const decodedValue = decodeHtmlEntities(rawValue);
-				if (decodedValue !== rawValue) {
-					styleAttributeHashes.add(hashSha256(decodedValue));
-				}
-			}
-		}
+	const sourcesByRoute = new Map<string, CspHashSources>();
+	for (const [route, hashSets] of hashSetsByRoute.entries()) {
+		sourcesByRoute.set(route, buildCspHashSources(hashSets));
 	}
 
 	return {
-		styleElementSources: quoteAndSortHashes(inlineStyleHashes),
-		styleAttributeSources: quoteAndSortHashes(styleAttributeHashes),
-		scriptElementSources: quoteAndSortHashes(inlineScriptHashes),
-		inlineStyleHashes: inlineStyleHashes.size,
-		styleAttributeHashes: styleAttributeHashes.size,
-		inlineScriptHashes: inlineScriptHashes.size,
+		sourcesByRoute,
+		totals: buildCspHashSources(totals),
 	};
 }
 
@@ -369,17 +504,15 @@ async function patchRoutesCsp(
 	buildDir: string,
 	cspOptions: ResolvedCspOptions,
 ): Promise<CspHashReport> {
-	const cspRoutes = Object.values(routes)
-		.map((headers) => {
+	const cspRoutes = Object.entries(routes)
+		.map(([route, headers]) => {
 			const headerKey = findHeaderKey(headers, CONTENT_SECURITY_POLICY_HEADER);
 			if (!headerKey) {
 				return undefined;
 			}
-			return { headers, headerKey };
+			return { route, headers, headerKey };
 		})
-		.filter((route): route is { headers: Record<string, string>; headerKey: string } =>
-			Boolean(route),
-		);
+		.filter((route): route is CspRoute => Boolean(route));
 
 	if (cspRoutes.length === 0) {
 		return {
@@ -387,6 +520,112 @@ async function patchRoutesCsp(
 			styleAttributeHashes: 0,
 			inlineScriptHashes: 0,
 			updatedCspHeaders: 0,
+		};
+	}
+
+	if (cspOptions.mode === "route") {
+		const routeHashes = await collectCspHashesByRouteFromBuild(buildDir, cspOptions);
+		let updatedCspHeaders = 0;
+
+		const exactRoutes = cspRoutes.filter(({ route }) => !route.includes("*"));
+		const wildcardRoutes: WildcardCspRoute[] = cspRoutes
+			.filter(({ route }) => route.includes("*"))
+			.map((route, originalOrder): WildcardCspRoute => ({
+				...route,
+				pattern: new RegExp(
+					`^${route.route
+						.split("*")
+						.map((segment) => segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+						.join(".*")}$`,
+				),
+				originalOrder,
+			}))
+			.sort((left, right) => {
+				const leftSpecificity = left.route.replace(/\*/g, "").length;
+				const rightSpecificity = right.route.replace(/\*/g, "").length;
+				if (leftSpecificity !== rightSpecificity) {
+					return rightSpecificity - leftSpecificity;
+				}
+				return left.originalOrder - right.originalOrder;
+			});
+
+		for (const route of exactRoutes) {
+			const directSources = routeHashes.sourcesByRoute.get(route.route);
+			let sources = directSources;
+			if (!sources) {
+				const normalizedRoute = route.route === "/" ? "/" : route.route.replace(/\/+$/, "");
+				for (const [hashRoute, hashSources] of routeHashes.sourcesByRoute.entries()) {
+					const normalizedHashRoute =
+						hashRoute === "/" ? "/" : hashRoute.replace(/\/+$/, "");
+					if (normalizedHashRoute === normalizedRoute) {
+						sources = hashSources;
+						break;
+					}
+				}
+			}
+
+			if (!sources || !hasAnyCspSources(sources)) {
+				continue;
+			}
+
+			const currentValue = route.headers[route.headerKey];
+			const nextValue = patchCspValue(currentValue, sources, cspOptions);
+			if (nextValue !== currentValue) {
+				route.headers[route.headerKey] = nextValue;
+				updatedCspHeaders += 1;
+			}
+		}
+
+		for (const [builtRoute, sources] of routeHashes.sourcesByRoute.entries()) {
+			if (!hasAnyCspSources(sources)) {
+				continue;
+			}
+
+			const normalizedBuiltRoute = builtRoute === "/" ? "/" : builtRoute.replace(/\/+$/, "");
+			const existingRouteEntry = Object.entries(routes).find(([route]) => {
+				if (route.includes("*")) {
+					return false;
+				}
+				const normalizedRoute = route === "/" ? "/" : route.replace(/\/+$/, "");
+				return normalizedRoute === normalizedBuiltRoute;
+			});
+			const existingRouteKey = existingRouteEntry?.[0];
+			const existingHeaders = existingRouteKey ? routes[existingRouteKey] : undefined;
+			const existingHeaderKey = existingHeaders
+				? findHeaderKey(existingHeaders, CONTENT_SECURITY_POLICY_HEADER)
+				: undefined;
+
+			if (existingHeaderKey) {
+				continue;
+			}
+
+			const template = wildcardRoutes.find(({ pattern }) => pattern.test(builtRoute));
+			if (!template) {
+				continue;
+			}
+
+			const targetRouteKey = existingRouteKey ?? builtRoute;
+			const targetHeaders = existingHeaders ?? {};
+			const nextValue = patchCspValue(
+				template.headers[template.headerKey],
+				sources,
+				cspOptions,
+			);
+
+			if (nextValue === template.headers[template.headerKey]) {
+				continue;
+			}
+
+			targetHeaders[template.headerKey] = nextValue;
+			routes[targetRouteKey] = targetHeaders;
+			updatedCspHeaders += 1;
+		}
+
+		return {
+			inlineStyleHashes: routeHashes.totals.inlineStyleHashes,
+			styleAttributeHashes: routeHashes.totals.styleAttributeHashes,
+			inlineScriptHashes: routeHashes.totals.inlineScriptHashes,
+			updatedCspHeaders,
 		};
 	}
 
@@ -409,6 +648,44 @@ async function patchRoutesCsp(
 		inlineScriptHashes: sources.inlineScriptHashes,
 		updatedCspHeaders,
 	};
+}
+
+function enforceHeaderLineLengthLimit(
+	routes: Routes,
+	cspOptions: ResolvedCspOptions,
+	logger: AstroIntegrationLogger,
+): void {
+	const exceedingLines: { route: string; headerName: string; length: number }[] = [];
+
+	for (const [route, headers] of Object.entries(routes)) {
+		for (const [headerName, headerValue] of Object.entries(headers)) {
+			const headerLine = `  ${headerName}: ${headerValue}`;
+			if (headerLine.length > cspOptions.maxHeaderLineLength) {
+				exceedingLines.push({
+					route,
+					headerName,
+					length: headerLine.length,
+				});
+			}
+		}
+	}
+
+	if (exceedingLines.length === 0) {
+		return;
+	}
+
+	const [firstExceededLine] = exceedingLines;
+	const message =
+		`[${NAME}] Header line length overflow: ${firstExceededLine.length} characters for "${firstExceededLine.route}" -> ` +
+		`"${firstExceededLine.headerName}". Max allowed is ${cspOptions.maxHeaderLineLength}. ` +
+		`Found ${exceedingLines.length} overflowing line(s).`;
+
+	if (cspOptions.overflow === "warn") {
+		logger.warn(message);
+		return;
+	}
+
+	throw new Error(message);
 }
 
 // Helper function to generate the _headers file content.
@@ -507,6 +784,7 @@ export default function astroCloudflarePagesHeaders(
 					}
 				}
 
+				enforceHeaderLineLengthLimit(routes, cspOptions, logger);
 				const headersContent = generateHeadersContent(routes);
 
 				try {

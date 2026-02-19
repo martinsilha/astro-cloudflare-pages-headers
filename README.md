@@ -78,10 +78,13 @@ export default defineConfig({
     astroCloudflarePagesHeaders({
       csp: {
         autoHashes: true,
+        mode: 'route',
         hashStyleElements: true,
         hashStyleAttributes: true,
         hashInlineScripts: false,
         stripUnsafeInline: true,
+        maxHeaderLineLength: 2000,
+        overflow: 'error',
       },
     }),
   ],
@@ -91,10 +94,13 @@ export default defineConfig({
 `csp` options:
 
 - `autoHashes` (default: `false`): Enables post-build CSP patching.
+- `mode` (default: `global`): `global` unions hashes from all HTML into each CSP route. `route` emits route-specific CSP hashes per built HTML route and keeps wildcard CSP routes as strict fallback templates.
 - `hashStyleElements` (default: `true`): Adds hashes for inline `<style>` blocks.
 - `hashStyleAttributes` (default: `true`): Adds hashes for `style=""` attributes (via `style-src-attr` + `'unsafe-hashes'`).
 - `hashInlineScripts` (default: `false`): Adds hashes for inline `<script>` blocks.
 - `stripUnsafeInline` (default: `true`): Removes `'unsafe-inline'` from patched directives when hashes are injected.
+- `maxHeaderLineLength` (default: `2000`): Maximum allowed length for each emitted header line.
+- `overflow` (default: `error`): Overflow behavior when a header line exceeds `maxHeaderLineLength`. Use `error` to fail the build or `warn` to log and continue.
 
 By default (`autoHashes: false`), behavior is unchanged from previous versions.
 

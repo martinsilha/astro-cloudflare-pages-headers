@@ -10,6 +10,9 @@ export interface CspAutoHashesOptions {
 	hashStyleAttributes?: boolean;
 	hashInlineScripts?: boolean;
 	stripUnsafeInline?: boolean;
+	mode?: "global" | "route" | "per-route";
+	maxHeaderLineLength?: number;
+	overflow?: "error" | "warn";
 }
 
 export interface AstroCloudflarePagesHeadersOptions {

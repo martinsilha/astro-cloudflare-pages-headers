@@ -17,6 +17,38 @@ describe("astro-cloudflarePagesHeaders integration", () => {
 	const hashSha256 = (value: string): string =>
 		`sha256-${createHash("sha256").update(value, "utf8").digest("base64")}`;
 
+	const parseGeneratedHeaders = (content: string): Record<string, Record<string, string>> => {
+		const parsed: Record<string, Record<string, string>> = {};
+		let currentRoute: string | undefined;
+
+		for (const line of content.split("\n")) {
+			if (!line.trim()) {
+				continue;
+			}
+
+			if (!line.startsWith("  ")) {
+				currentRoute = line.trim();
+				parsed[currentRoute] = {};
+				continue;
+			}
+
+			if (!currentRoute) {
+				continue;
+			}
+
+			const delimiterIndex = line.indexOf(":");
+			if (delimiterIndex < 0) {
+				continue;
+			}
+
+			const headerName = line.slice(2, delimiterIndex).trim();
+			const headerValue = line.slice(delimiterIndex + 1).trim();
+			parsed[currentRoute][headerName] = headerValue;
+		}
+
+		return parsed;
+	};
+
 	const createLogger = () => {
 		const nextLogger: any = {
 			info: vi.fn(),
@@ -207,6 +239,129 @@ describe("astro-cloudflarePagesHeaders integration", () => {
 				call[0].includes("CSP auto-hash patch completed: 1 inline style hashes, 1 style attribute hashes, 1 inline script hashes, 1 updated CSP headers."),
 			),
 		).toBe(true);
+	});
+
+	it("should patch CSP hashes per HTML route when csp.mode is route", async () => {
+		setIntegration({
+			csp: {
+				autoHashes: true,
+				hashInlineScripts: true,
+				mode: "route",
+			},
+		});
+
+		const rootStyleContent = "body{color:red}";
+		const rootScriptContent = "console.log('root')";
+		const aboutStyleContent = "body{color:blue}";
+		const aboutScriptContent = "console.log('about')";
+		const rootHtml = `<style>${rootStyleContent}</style><script>${rootScriptContent}</script>`;
+		const aboutHtml = `<style>${aboutStyleContent}</style><script>${aboutScriptContent}</script>`;
+		const buildDirPath = path.resolve("buildDir");
+		const aboutDirPath = path.resolve(buildDirPath, "about");
+		const rootHtmlPath = path.resolve(buildDirPath, "index.html");
+		const aboutHtmlPath = path.resolve(aboutDirPath, "index.html");
+
+		vi.spyOn(fs, "readdir").mockImplementation(async (directoryPath) => {
+			const resolvedDirectory = path.resolve(String(directoryPath));
+			if (resolvedDirectory === buildDirPath) {
+				return [
+					createDirent("index.html", "file"),
+					createDirent("about", "directory"),
+				] as any;
+			}
+			if (resolvedDirectory === aboutDirPath) {
+				return [createDirent("index.html", "file")] as any;
+			}
+			return [] as any;
+		});
+
+		vi.spyOn(fs, "readFile").mockImplementation(async (filePath) => {
+			const resolvedFilePath = path.resolve(String(filePath));
+			if (resolvedFilePath === rootHtmlPath) {
+				return rootHtml as any;
+			}
+			if (resolvedFilePath === aboutHtmlPath) {
+				return aboutHtml as any;
+			}
+			return "" as any;
+		});
+
+		configureHeaders({
+			"Content-Security-Policy": "default-src 'self'; style-src 'self'; script-src 'self';",
+			"X-Test": "value",
+		});
+
+		await runBuildDone();
+
+		const rootStyleHash = hashSha256(rootStyleContent);
+		const rootScriptHash = hashSha256(rootScriptContent);
+		const aboutStyleHash = hashSha256(aboutStyleContent);
+		const aboutScriptHash = hashSha256(aboutScriptContent);
+		const writtenHeaders = writeFileSpy.mock.calls[0][1] as string;
+		const parsedHeaders = parseGeneratedHeaders(writtenHeaders);
+
+		expect(parsedHeaders["/*"]["Content-Security-Policy"]).toBe(
+			"default-src 'self'; style-src 'self'; script-src 'self';",
+		);
+		expect(parsedHeaders["/*"]["X-Test"]).toBe("value");
+
+		expect(parsedHeaders["/"]["Content-Security-Policy"]).toContain(
+			`style-src 'self' '${rootStyleHash}'`,
+		);
+		expect(parsedHeaders["/"]["Content-Security-Policy"]).toContain(
+			`script-src 'self' '${rootScriptHash}'`,
+		);
+		expect(parsedHeaders["/"]["Content-Security-Policy"]).not.toContain(aboutStyleHash);
+		expect(parsedHeaders["/"]["Content-Security-Policy"]).not.toContain(aboutScriptHash);
+
+		expect(parsedHeaders["/about/"]["Content-Security-Policy"]).toContain(
+			`style-src 'self' '${aboutStyleHash}'`,
+		);
+		expect(parsedHeaders["/about/"]["Content-Security-Policy"]).toContain(
+			`script-src 'self' '${aboutScriptHash}'`,
+		);
+		expect(parsedHeaders["/about/"]["Content-Security-Policy"]).not.toContain(rootStyleHash);
+		expect(parsedHeaders["/about/"]["Content-Security-Policy"]).not.toContain(rootScriptHash);
+	});
+
+	it("should fail build when a header line exceeds maxHeaderLineLength and overflow is error", async () => {
+		setIntegration({
+			csp: {
+				maxHeaderLineLength: 40,
+				overflow: "error",
+			},
+		});
+
+		configureHeaders({
+			"/test": {
+				"X-Long-Header": "x".repeat(100),
+			},
+		});
+
+		await expect(runBuildDone()).rejects.toThrow("Header line length overflow");
+		expect(writeFileSpy).not.toHaveBeenCalled();
+	});
+
+	it("should warn and keep building when a header line exceeds maxHeaderLineLength and overflow is warn", async () => {
+		setIntegration({
+			csp: {
+				maxHeaderLineLength: 40,
+				overflow: "warn",
+			},
+		});
+
+		configureHeaders({
+			"/test": {
+				"X-Long-Header": "x".repeat(100),
+			},
+		});
+
+		await runBuildDone();
+
+		expect(logger.warn).toHaveBeenCalledWith(
+			expect.stringContaining("Header line length overflow"),
+		);
+		expect(writeFileSpy).toHaveBeenCalled();
 	});
 
 	it("should log an error if writing the _headers file fails", async () => {
