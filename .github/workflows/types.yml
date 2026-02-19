@@ -1,14 +1,17 @@
 name: Types
-on: [push, pull_request]
+on:
+  pull_request:
+    branches:
+      - main
 jobs:
   type-check:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
       - name: Install dependencies
