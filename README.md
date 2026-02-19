@@ -94,7 +94,7 @@ export default defineConfig({
 `csp` options:
 
 - `autoHashes` (default: `false`): Enables post-build CSP patching.
-- `mode` (default: `global`): `global` unions hashes from all HTML into each CSP route. `route` emits route-specific CSP hashes per built HTML route and keeps wildcard CSP routes as strict fallback templates.
+- `mode` (default: `global`): `global` unions hashes from all HTML into each CSP route. `route` emits route-specific CSP hashes per built HTML route and also patches wildcard CSP routes with aggregate hashes to avoid wildcard/exact-route CSP conflicts at runtime.
 - `hashStyleElements` (default: `true`): Adds hashes for inline `<style>` blocks.
 - `hashStyleAttributes` (default: `true`): Adds hashes for `style=""` attributes (via `style-src-attr` + `'unsafe-hashes'`).
 - `hashInlineScripts` (default: `false`): Adds hashes for inline `<script>` blocks.
