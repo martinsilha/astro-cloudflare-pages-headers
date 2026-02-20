@@ -70,9 +70,9 @@ const DEFAULT_CSP_OPTIONS: ResolvedCspOptions = {
 	autoHashes: false,
 	hashStyleElements: true,
 	hashStyleAttributes: true,
-	hashInlineScripts: false,
+	hashInlineScripts: true,
 	stripUnsafeInline: true,
-	mode: "global",
+	mode: "route",
 	maxHeaderLineLength: 2000,
 	overflow: "error",
 };
@@ -647,15 +647,11 @@ async function patchRoutesCsp(
 			updatedCspHeaders += 1;
 		}
 
-		if (hasAnyCspSources(routeHashes.totals)) {
-			for (const wildcardRoute of wildcardRoutes) {
-				const currentValue = wildcardRoute.headers[wildcardRoute.headerKey];
-				const nextValue = patchCspValue(currentValue, routeHashes.totals, cspOptions);
-				if (nextValue !== currentValue) {
-					wildcardRoute.headers[wildcardRoute.headerKey] = nextValue;
-					updatedCspHeaders += 1;
-				}
-			}
+		// In route mode, exact routes get route-specific hashes. Keeping CSP on wildcard
+		// routes would make browsers enforce both policies (intersection) and can also
+		// exceed Cloudflare's per-line header length limit.
+		for (const wildcardRoute of wildcardRoutes) {
+			delete wildcardRoute.headers[wildcardRoute.headerKey];
 		}
 
 		return {

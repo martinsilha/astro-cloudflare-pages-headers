@@ -190,7 +190,7 @@ describe("astro-cloudflarePagesHeaders integration", () => {
 		setIntegration({
 			csp: {
 				autoHashes: true,
-				hashInlineScripts: true,
+				mode: "global",
 			},
 		});
 
@@ -245,7 +245,7 @@ describe("astro-cloudflarePagesHeaders integration", () => {
 		setIntegration({
 			csp: {
 				autoHashes: true,
-				hashInlineScripts: true,
+				mode: "global",
 			},
 		});
 
@@ -288,12 +288,10 @@ describe("astro-cloudflarePagesHeaders integration", () => {
 		expect(writtenHeaders).not.toContain("script-src-elem 'self' 'unsafe-inline'");
 	});
 
-	it("should patch CSP hashes per HTML route when csp.mode is route", async () => {
+	it("should patch CSP hashes per HTML route when csp.mode defaults to route", async () => {
 		setIntegration({
 			csp: {
 				autoHashes: true,
-				hashInlineScripts: true,
-				mode: "route",
 			},
 		});
 
@@ -347,18 +345,7 @@ describe("astro-cloudflarePagesHeaders integration", () => {
 		const writtenHeaders = writeFileSpy.mock.calls[0][1] as string;
 		const parsedHeaders = parseGeneratedHeaders(writtenHeaders);
 
-		expect(parsedHeaders["/*"]["Content-Security-Policy"]).toContain(
-			`'${rootStyleHash}'`,
-		);
-		expect(parsedHeaders["/*"]["Content-Security-Policy"]).toContain(
-			`'${aboutStyleHash}'`,
-		);
-		expect(parsedHeaders["/*"]["Content-Security-Policy"]).toContain(
-			`'${rootScriptHash}'`,
-		);
-		expect(parsedHeaders["/*"]["Content-Security-Policy"]).toContain(
-			`'${aboutScriptHash}'`,
-		);
+		expect(parsedHeaders["/*"]["Content-Security-Policy"]).toBeUndefined();
 		expect(parsedHeaders["/*"]["X-Test"]).toBe("value");
 
 		expect(parsedHeaders["/"]["Content-Security-Policy"]).toContain(

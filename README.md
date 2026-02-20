@@ -21,7 +21,7 @@ A lightweight [integration](https://astro.build/integrations/) for [Astro](https
 - Automatic `_headers` generation: Reads header settings from your `astro.config.mjs` and generates a `_headers` file during build.
 - Flexible configuration: Supports both flat and nested header formats.
 - Workers wildcard normalization: Optionally remaps a universal `*` route to `/*` in generated `_headers`.
-- Optional CSP auto-hashes: Can scan built HTML and append CSP hashes for inline styles, style attributes, and optionally inline scripts.
+- Optional CSP auto-hashes: Can scan built HTML and append CSP hashes for inline styles, style attributes, and inline scripts.
 - Informative logging: Provides useful log messages during setup and build.
 
 ## Installation
@@ -78,10 +78,9 @@ export default defineConfig({
     astroCloudflarePagesHeaders({
       csp: {
         autoHashes: true,
-        mode: 'route',
         hashStyleElements: true,
         hashStyleAttributes: true,
-        hashInlineScripts: false,
+        hashInlineScripts: true,
         stripUnsafeInline: true,
         maxHeaderLineLength: 2000,
         overflow: 'error',
@@ -94,10 +93,10 @@ export default defineConfig({
 `csp` options:
 
 - `autoHashes` (default: `false`): Enables post-build CSP patching.
-- `mode` (default: `global`): `global` unions hashes from all HTML into each CSP route. `route` emits route-specific CSP hashes per built HTML route and also patches wildcard CSP routes with aggregate hashes to avoid wildcard/exact-route CSP conflicts at runtime.
+- `mode` (default: `route`): `global` unions hashes from all HTML into each CSP route. `route` emits route-specific CSP hashes per built HTML route and removes wildcard CSP headers to avoid wildcard/exact-route CSP conflicts at runtime.
 - `hashStyleElements` (default: `true`): Adds hashes for inline `<style>` blocks.
 - `hashStyleAttributes` (default: `true`): Adds hashes for `style=""` attributes (via `style-src-attr` + `'unsafe-hashes'`).
-- `hashInlineScripts` (default: `false`): Adds hashes for inline `<script>` blocks.
+- `hashInlineScripts` (default: `true`): Adds hashes for inline `<script>` blocks.
 - `stripUnsafeInline` (default: `true`): Removes `'unsafe-inline'` from patched directives when hashes are injected.
 - `maxHeaderLineLength` (default: `2000`): Maximum allowed length for each emitted header line.
 - `overflow` (default: `error`): Overflow behavior when a header line exceeds `maxHeaderLineLength`. Use `error` to fail the build or `warn` to log and continue.
