@@ -35,6 +35,9 @@ importers:
       astro-eslint-parser:
         specifier: ^1.3.0
         version: 1.3.0
+      eslint:
+        specifier: ^9.39.3
+        version: 9.39.3
       eslint-plugin-import:
         specifier: ^2.32.0
         version: 2.32.0(@typescript-eslint/parser@8.56.1(eslint@9.39.3)(typescript@5.9.3))(eslint@9.39.3)
