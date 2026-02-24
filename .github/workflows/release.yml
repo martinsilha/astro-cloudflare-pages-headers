@@ -29,15 +29,19 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
+          cache: pnpm
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run checks
-        run: npm run types && npm run lint && npm run test:unit
+        run: pnpm run types && pnpm run lint && pnpm run test:unit
 
       - name: Run Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npx semantic-release
+        run: pnpm exec semantic-release
