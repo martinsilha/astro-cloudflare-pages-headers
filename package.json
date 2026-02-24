@@ -3,7 +3,7 @@
     "homepage": "https://github.com/martinsilha/astro-cloudflare-pages-headers",
     "repository": {
         "type": "git",
-        "url": "https://github.com/martinsilha/astro-cloudflare-pages-headers"
+        "url": "git+https://github.com/martinsilha/astro-cloudflare-pages-headers.git"
     },
     "description": "A lightweight integration for Astro that automatically generates a Cloudflare Pages _headers file for deployments based on your server header configuration.",
     "version": "1.7.6-dev.1",
