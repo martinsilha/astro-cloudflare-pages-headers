@@ -1,6 +1,6 @@
 # Astro and Cloudflare upgrade handoff for Luna
 
-Status: implementation and local validation are present for the declared stable Astro 4–7 range. Local acceptance is complete; GitHub Actions readback is the remaining verification gate. See the [completion report](completion-report.md) and [acceptance checklist](acceptance-criteria.md).
+Status: implementation, local validation, and PR checks are complete for the declared stable Astro 4–7 range. See the [completion report](completion-report.md) and [acceptance checklist](acceptance-criteria.md).
 
 Prepared on 2026-09-30 for `astro-cloudflare-pages-headers`.
 
@@ -33,4 +33,4 @@ These are observations from planning, not current validation results. The [compl
 
 ## Definition of complete
 
-The implementation, local package/build checks, pinned compatibility builds, selected local Workers/Pages HTTP suites, CI configuration, and migration documentation are present. Full release acceptance requires the current GitHub CI run to pass all configured gates. No production deployment or npm publication was performed.
+The implementation, local package/build checks, pinned compatibility builds, selected local Workers/Pages HTTP suites, CI configuration, and migration documentation are present. Full acceptance is complete: PR #12's GitHub checks passed across all configured gates. No production deployment or npm publication was performed.

@@ -1,6 +1,6 @@
 # Implementation and verification report
 
-Updated 2026-09-30 for `astro-cloudflare-pages-headers`. The implementation and local compatibility suite are complete for the declared stable Astro 4–7 range. Local evidence now closes the remaining cache-collision, host-limit, pure-SSR CSP, and unresolved-policy criteria; GitHub Actions readback is the final acceptance gate.
+Updated 2026-09-30 for `astro-cloudflare-pages-headers`. The implementation, local compatibility suite, and required PR checks are complete for the declared stable Astro 4–7 range. Local evidence closes the remaining cache-collision, host-limit, pure-SSR CSP, and unresolved-policy criteria. PR #12's compatibility matrix and repository checks passed; the report records the exact run below.
 
 ## Delivered
 
@@ -19,7 +19,7 @@ The working-tree package version is `1.7.7-dev.1`; `2.0.0` appears only in draft
 | Packed package checks | Passed: compiled ESM and declarations, native Node ESM import without a TS loader, no tests/fixtures/docs in the tarball, and no Node filesystem/path/hash imports in the runtime bundle. |
 | Packed consumer matrix | Passed for all eight exact rows below. Every row exercised the adapter build and static Pages build with default and custom output layouts; Astro 6/7 also exercised static output with the Cloudflare adapter. |
 | Local host tests | Latest Astro 6/7 passed Worker preview/dev; Astro 4/5 legacy fixtures passed Wrangler Pages serving. Latest Astro 7 also passed Pages CSP serving, cache-override HTTP cases, and route/global/native CSP Worker cases. |
-| GitHub CI | Pending a pull-request run for these changes; prior repository runs do not cover this work. |
+| GitHub CI | Passed on PR [#12](https://github.com/martinsilha/astro-cloudflare-pages-headers/pull/12), targeting `dev`: Lint, Test, Types, package, and all eight compatibility rows. Compatibility run [36725733944](https://github.com/martinsilha/astro-cloudflare-pages-headers/actions/runs/36725733944); Lint run [36725733816](https://github.com/martinsilha/astro-cloudflare-pages-headers/actions/runs/36725733816); Test run [36725733823](https://github.com/martinsilha/astro-cloudflare-pages-headers/actions/runs/36725733823); Types run [36725733986](https://github.com/martinsilha/astro-cloudflare-pages-headers/actions/runs/36725733986). All completed successfully on 2026-09-30. |
 
 The compatibility runner command is `pnpm run test:compatibility` with `FIXTURE_ASTRO_VERSION`, `FIXTURE_ADAPTER_VERSION`, and `FIXTURE_WRANGLER_VERSION` set to a row below and `FIXTURE_PACKAGE_TARBALL` pointing at the packed artifact. Frozen per-row lockfiles pin the installed pair.
 
@@ -46,8 +46,8 @@ The final cache and host-limit checks closed S5–S6. A second Astro integration
 
 CSP failure checks closed H6: route-mode SPA and 404 fallback expansion rejects with actionable guidance; an unresolved preserved-policy conflict in global mode fails before changing the existing `_headers`; and an early host-qualified conflict fails without writing provisional output. The report distinguishes these unit checks from real builds and local Workers/Pages serving. No production deployment or npm publication was performed. A pure-SSR Astro 7 Worker preview returned the configured route CSP without any hashes from the empty static build, while the mixed-rendering fixture independently proved that runtime CSP remains separate from page-specific static hashes. The pure-SSR build emitted no prerendered HTML and passed both deployable-output and preview HTTP checks.
 
-## Acceptance item still open
+## Acceptance status
 
-The linked [acceptance checklist](acceptance-criteria.md) leaves only **M5** open: obtain GitHub Actions readback for this change. Local unit, package, build, workerd, Pages, and Worker results do not substitute for that run. The new compatibility workflow is configured for pull requests to both `main` and `dev`, and the release workflow depends on its matrix.
+All items in the linked [acceptance checklist](acceptance-criteria.md), including **M5**, are complete. GitHub Actions readback confirms the package, type, lint, test, and eight-row compatibility jobs passed on PR #12 against `dev`. The compatibility workflow is configured for pull requests to both `main` and `dev`, and the release workflow depends on its matrix.
 
 The user-owned untracked `demo/` directory was left untouched. No production Cloudflare resources, deployment, or npm publication were involved.
