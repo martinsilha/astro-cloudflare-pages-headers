@@ -1,21 +1,13 @@
 {
   "extends": "astro/tsconfigs/strict",
-  "include": [
-    ".astro/**/*",
-    ".astro/types.d.ts",
-    "**/*"
-  ],
-  "exclude": [
-    "dist",
-    "node_modules",
-    "demo"
-  ],
+  "include": [".astro/**/*", ".astro/types.d.ts", "**/*"],
+  "exclude": ["dist", "node_modules", "demo", "fixtures"],
   "compilerOptions": {
-    "module": "ES6",
-    "target": "ES6",
-    "moduleResolution": "node",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "esModuleInterop": true,
-    "jsx": "preserve",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noEmit": true
   }
 }

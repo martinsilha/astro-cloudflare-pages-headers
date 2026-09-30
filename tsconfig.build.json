@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "index.ts",
+    "src/integration.ts",
+    "src/types.ts",
+    "src/headers-config.ts",
+    "src/headers-file.ts",
+    "src/output-path.ts",
+    "src/runtime-core.ts",
+    "src/runtime.ts",
+    "src/virtual.d.ts"
+  ],
+  "exclude": ["**/*.test.ts", "node_modules", "dist"],
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "declaration": true,
+    "declarationMap": false,
+    "rootDir": ".",
+    "outDir": "dist"
+  }
+}

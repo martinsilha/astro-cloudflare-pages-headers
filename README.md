@@ -1,233 +1,108 @@
 # astro-cloudflare-pages-headers
 
-![npm](https://img.shields.io/npm/v/astro-cloudflare-pages-headers)
-![GitHub](https://img.shields.io/github/license/martinsilha/astro-cloudflare-pages-headers)
+Astro integration for Cloudflare static assets and Workers responses. It writes Cloudflare `_headers` rules into the static asset output and, when the official Cloudflare adapter is present, applies the same configured headers to Astro-generated Worker responses.
 
-![GitHub Stars](https://img.shields.io/github/stars/martinsilha/astro-cloudflare-pages-headers?style=social)
-![npm downloads](https://img.shields.io/npm/dm/astro-cloudflare-pages-headers?style=social)
+## Support
 
-![GitHub Release Date](https://img.shields.io/github/release-date/martinsilha/astro-cloudflare-pages-headers)
-![GitHub last commit](https://img.shields.io/github/last-commit/martinsilha/astro-cloudflare-pages-headers)
+The package declares stable Astro `^4`, `^5`, `^6`, and `^7` support. Use a Cloudflare adapter version whose own peer dependencies include your Astro version. Astro 4 and 5 projects can target Pages or Workers according to their adapter version. Astro 6 and 7 Cloudflare SSR deployments use Workers; their official adapters no longer target Pages. Static sites can still deploy their generated assets to Pages.
 
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/martinsilha/astro-cloudflare-pages-headers/types.yml?branch=main&label=types)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/martinsilha/astro-cloudflare-pages-headers/lint.yml?branch=main&label=lint)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/martinsilha/astro-cloudflare-pages-headers/test.yml?branch=main&label=test)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/martinsilha/astro-cloudflare-pages-headers/release.yml?branch=main&label=release)
+The repository compatibility workflow builds the minimum and latest tested Astro/adapter pairs. Versions outside Astro 4–7, prereleases, future majors, and third-party adapters are not claimed as supported.
 
-A lightweight [integration](https://astro.build/integrations/) for [Astro](https://astro.build/) that automatically generates a [Cloudflare Pages](https://pages.cloudflare.com/) `_headers` file for deployments based on your server header configuration.
+## Install
 
-## Features
-
-- Automatic `_headers` generation: Reads header settings from your `astro.config.mjs` and generates a `_headers` file during build.
-- Flexible configuration: Supports both flat and nested header formats.
-- Workers wildcard normalization: Optionally remaps a universal `*` route to `/*` in generated `_headers`.
-- Optional CSP auto-hashes: Can scan built HTML and append CSP hashes for inline styles, style attributes, and inline scripts.
-- Informative logging: Provides useful log messages during setup and build.
-
-## Installation
-
-Install the integration via the `astro add` command:
-
-```bash
-astro add astro-cloudflare-pages-headers
+```sh
+pnpm add astro-cloudflare-pages-headers
 ```
 
-## Usage
+Use an Astro version accepted by your chosen Cloudflare adapter. The integration is published as compiled ESM with TypeScript declarations and supports Node 18.17.1 or newer; Astro and adapter runtime requirements still apply to your application.
 
-Add the integration to your [Astro configuration file](https://docs.astro.build/en/reference/configuration-reference/) (`astro.config.mjs`). The integration looks for [header settings](https://docs.astro.build/en/reference/configuration-reference/#serverheaders) in the `server.headers` property:
+## Cloudflare Workers
 
-### Example with Flat Headers
-
-`astro.config.mjs`:
-
-```js,ts
+```js
+// astro.config.mjs
 import { defineConfig } from 'astro/config';
+import cloudflare from '@astrojs/cloudflare';
 import astroCloudflarePagesHeaders from 'astro-cloudflare-pages-headers';
 
 export default defineConfig({
-  integrations: [
-    astroCloudflarePagesHeaders(),
-  ],
-  server: {
-    headers: {
-      'X-Custom-Header': 'my-value',
-      'X-Another-Header': 'another-value'
-    },
-  },
-});
-```
-
-This configuration generates the following `_headers` file:
-
-```plaintext
-/*
-  X-Custom-Header: my-value
-  X-Another-Header: another-value
-```
-
-### Optional CSP Auto-Hashing
-
-If you use CSP integrations (for example `astro-shield`) and want inline hashes added automatically, enable the optional CSP pass:
-
-```js,ts
-import { defineConfig } from 'astro/config';
-import astroCloudflarePagesHeaders from 'astro-cloudflare-pages-headers';
-
-export default defineConfig({
+  output: 'server',
+  adapter: cloudflare(),
   integrations: [
     astroCloudflarePagesHeaders({
-      csp: {
-        autoHashes: true,
-        hashStyleElements: true,
-        hashStyleAttributes: true,
-        hashInlineScripts: true,
-        stripUnsafeInline: true,
-        maxHeaderLineLength: 2000,
-        overflow: 'error',
+      headers: {
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
       },
     }),
   ],
 });
 ```
 
-`csp` options:
+For Astro 4 hybrid output, use `output: 'hybrid'` and the compatible adapter release. In auto mode (the default), the integration registers Astro middleware for the official Cloudflare adapter. Static assets receive `_headers`; Astro responses such as SSR pages and endpoints receive the configured headers at runtime. If the application already sets a header, its value wins. This lets route code keep a nonce-based CSP or a private cache policy.
 
-- `autoHashes` (default: `false`): Enables post-build CSP patching.
-- `mode` (default: `route`): `global` unions hashes from all HTML into each CSP route. `route` emits route-specific CSP hashes per built HTML route and removes wildcard CSP headers to avoid wildcard/exact-route CSP conflicts at runtime.
-- `hashStyleElements` (default: `true`): Adds hashes for inline `<style>` blocks.
-- `hashStyleAttributes` (default: `true`): Adds hashes for `style=""` attributes (via `style-src-attr` + `'unsafe-hashes'`).
-- `hashInlineScripts` (default: `true`): Adds hashes for inline `<script>` blocks.
-- `stripUnsafeInline` (default: `true`): Removes `'unsafe-inline'` from patched directives when hashes are injected.
-- `maxHeaderLineLength` (default: `2000`): Maximum allowed length for each emitted header line.
-- `overflow` (default: `error`): Overflow behavior when a header line exceeds `maxHeaderLineLength`. Use `error` to fail the build or `warn` to log and continue.
+Set `runtime: false` to disable response middleware while keeping static `_headers` generation, or `runtime: true` to enable the portable middleware with another Astro adapter. Middleware only sees responses handled by Astro. It does not run for direct static asset delivery, platform redirects, Worker code that bypasses Astro, or exceptions Astro has not converted to a response.
 
-By default (`autoHashes: false`), behavior is unchanged from previous versions.
+## Static assets and Pages
 
-### Workers Mode
+A static project does not need a Cloudflare adapter to generate `_headers`:
 
-If you want to keep `server.headers` using a universal `*` route (which is often convenient in dev), enable workers mode to normalize it to `/*` in generated `_headers`:
-
-```js,ts
+```js
+// astro.config.mjs
 import { defineConfig } from 'astro/config';
 import astroCloudflarePagesHeaders from 'astro-cloudflare-pages-headers';
 
 export default defineConfig({
+  output: 'static',
   integrations: [
     astroCloudflarePagesHeaders({
-      workers: true,
+      headers: {
+        '/assets/*': { 'Cache-Control': 'public, max-age=31536000, immutable' },
+        '/*': { 'X-Content-Type-Options': 'nosniff' },
+      },
     }),
   ],
-  server: {
-    headers: {
-      '*': {
-        'X-Frame-Options': 'DENY',
-      },
-    },
+});
+```
+
+Deploy the generated static output using Cloudflare Pages or as Workers static assets. With no explicit `headers` option, the integration reads Astro's final `server.headers` value for backward compatibility. When `headers` is present, it is the complete source; `headers: {}` intentionally disables inherited header rules. Flat string maps apply to `/*`; nested maps associate header values with Cloudflare route patterns. A universal `*` is normalized to `/*` automatically.
+
+If a custom adapter layout prevents reliable detection of the deployed static asset root, set `assetsDirectory` to an absolute path, a path relative to the Astro project root, or a file URL. The value must agree with a deployment path the adapter explicitly generated.
+
+## Route rules
+
+Rules support Cloudflare exact paths, one `*` wildcard, named `:placeholder` segments, and HTTPS host-qualified patterns. Placeholders can be used in header values. Query strings do not affect path matching. Host-qualified patterns require HTTPS and no port. Header names match case-insensitively. Invalid routes, header names, non-string values, and CR/LF values fail configuration rather than being written into `_headers`.
+
+```js
+astroCloudflarePagesHeaders({
+  headers: {
+    '/*': { 'X-Content-Type-Options': 'nosniff' },
+    '/users/:id': { 'X-User-Route': 'user-:id' },
   },
 });
 ```
 
-With `workers: true`, the generated `_headers` route becomes `/*`.
+The legacy `workers` option remains accepted but is deprecated and no longer needed for wildcard normalization.
 
-### Example with Nested Headers
+The integration preserves existing `_headers` rules and its own generated section can be replaced on later builds. It fails a build when the output layout cannot be resolved, required file operations fail, or Cloudflare's 100-rule/2,000-character limits are exceeded. `csp.overflow: 'warn'` is an explicit escape hatch; Cloudflare may reject such output.
 
-`astro.config.mjs`:
-```js,ts
-import { defineConfig } from 'astro/config';
-import astroCloudflarePagesHeaders from 'astro-cloudflare-pages-headers';
+## CSP hashes
 
-export default defineConfig({
-  integrations: [
-    astroCloudflarePagesHeaders(),
-  ],
-  server: {
-    headers: {
-      '/api': {
-        'Cache-Control': 'max-age=3600',
-      },
-      '/static': {
-        'X-Frame-Options': 'DENY',
-      },
-    },
-  },
-});
-```
+CSP hash generation is disabled by default. `csp: { autoHashes: true }` scans generated HTML during build and patches configured response-header policies. Route mode keeps the general policy as a fallback and creates per-page replacements; global mode adds the union of built hashes to each configured policy. Runtime HTML is never buffered or hashed. Dynamic pages need an application-generated CSP that covers their actual content.
 
-This configuration generates the following `_headers` file:
+Astro's native CSP remains independent. If both native CSP and integration-owned `Content-Security-Policy` rules are configured, both policies apply and the integration warns; choose one owner for script/style policy. CSP changes are described in the [2.0 migration guide](docs/migrations/2.0.md).
 
-```plaintext
-/api
-  Cache-Control: max-age=3600
+## Package exports
 
-/static
-  X-Frame-Options: DENY
-```
-
-## How It Works
-
-### Setup
-
-`astro:config:setup`
-
-The integration reads your header configuation from `config.server.headers` and stores it internally.
-
-### Build
-
-`astro:build:done`
-
-- If headers are configured, it converts them into the appropriate Cloudflare Pages format.
-- If `workers: true` is enabled, a universal `*` route is normalized to `/*` before writing `_headers`.
-- If `csp.autoHashes` is enabled, it scans generated HTML and patches `Content-Security-Policy` header directives with hash sources.
-- It writes the generated content to a `_headers` file in your build output directory.
-- Logs inform you if the file is successfully written or if any errors occur.
-- If no headers are configured, it logs a warning and skips file generation.
+The package root is a compiled ESM integration with declarations. The optional `astro-cloudflare-pages-headers/middleware` subpath exports the runtime middleware entrypoint. Import the package by its public name; importing repository TypeScript source is not supported.
 
 ## Development
 
-### Running Unit Tests
-
-This project uses [Vitest](https://vitest.dev/) for testing. To run the tests:
-
-Unit tests cover various scenarios including flat headers, nested headers, error handling, and logging verification.
-
-```bash
-npm test
+```sh
+pnpm install --frozen-lockfile
+pnpm run types
+pnpm run lint
+pnpm run test:unit
+pnpm run build:lib
 ```
 
-```bash
-pnpm test
-```
-
-```bash
-yarn test
-```
-
-### Testing Your Header Configuration
-
-[MDN Observatory](https://observatory.mozilla.org/) is a great tool for testing your headers. You can use it to [test your headers locally](https://github.com/mdn/mdn-http-observatory/) or after deploying to Cloudflare Pages.
-
-## Contributing
-
-Contributions and improvements are welcome. Feel free to open issues or submit pull requests on the repository.
-
-## License
-
-This project is licensed under the [MIT License](https://opensource.org/license/mit). See the [LICENSE](LICENSE) file for details.
-
-## Resources
-
-- [Astro](https://astro.build/)
-  - [Configuration Reference](https://docs.astro.build/en/reference/configuration-reference/)
-  - [Server Headers](https://docs.astro.build/en/reference/configuration-reference/#serverheaders)
-  - [Integrations](https://docs.astro.build/en/guides/integrations-guide/)
-
-- [Cloudflare Pages](https://pages.cloudflare.com/)
-  - [Cloudflare Pages Documentation](https://developers.cloudflare.com/pages/)
-  - [Customizing Headers](https://developers.cloudflare.com/pages/platform/headers)
-
-- [MDN Observatory](https://observatory.mozilla.org/)
-  - [mdn-http-observatory](https://github.com/mdn/mdn-http-observatory/)
-
-- [Vitest](https://vitest.dev/)
-  
-- [MIT License](https://opensource.org/licenses/MIT)
+The [compatibility workflow](.github/workflows/compatibility.yml) tests packed consumer builds against the pinned Astro/adapter matrix and static output builds. See [2.0 release notes](docs/releases/2.0.0.md) for breaking changes.

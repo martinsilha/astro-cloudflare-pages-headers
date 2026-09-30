@@ -11,7 +11,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  compatibility:
+    uses: ./.github/workflows/compatibility.yml
+
   release:
+    needs: compatibility
     runs-on: ubuntu-latest
     permissions:
       contents: write
