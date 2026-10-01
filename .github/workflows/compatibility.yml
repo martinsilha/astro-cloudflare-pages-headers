@@ -6,11 +6,22 @@ on:
   push:
     branches: [dev, main]
   workflow_call:
+    inputs:
+      release_validation:
+        description: Run all browser engines and keep reports for the release retention period.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
 
 jobs:
   package:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
@@ -22,70 +33,34 @@ jobs:
           node-version: 24.14.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run types && pnpm run lint && pnpm run test:unit && pnpm run build:lib
+      - id: matrix
+        run: node scripts/read-compatibility-matrix.mjs >> "$GITHUB_OUTPUT"
+      - name: Run unit, property, type, and lint gates
+        run: pnpm run types && pnpm run lint && pnpm run test:coverage:check && pnpm run test:property && pnpm run test:release && pnpm run build:lib
       - run: pnpm pack --pack-destination "$RUNNER_TEMP"
       - uses: actions/upload-artifact@v4
         with:
           name: astro-headers-package
           path: ${{ runner.temp }}/astro-cloudflare-pages-headers-*.tgz
           if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: |
+            coverage/coverage-summary.json
+            coverage/lcov.info
+          if-no-files-found: ignore
+          retention-days: 14
 
   consumer-matrix:
     needs: package
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - astro: '4.0.0'
-            adapter: '8.1.0'
-            wrangler: '3.114.17'
-            major: '4'
-            node: '18.20.8'
-            http: false
-          - astro: '4.16.19'
-            adapter: '11.2.0'
-            wrangler: '3.114.17'
-            major: '4'
-            node: '18.20.8'
-            http: false
-          - astro: '5.0.0'
-            adapter: '12.0.0'
-            wrangler: '4.59.2'
-            major: '5'
-            node: '24.14.0'
-            http: false
-          - astro: '5.18.2'
-            adapter: '12.6.13'
-            wrangler: '4.59.2'
-            major: '5'
-            node: '24.14.0'
-            http: false
-          - astro: '6.0.0'
-            adapter: '13.0.0'
-            wrangler: '4.144.0'
-            major: '6'
-            node: '24.14.0'
-            http: false
-          - astro: '6.4.8'
-            adapter: '13.7.0'
-            wrangler: '4.144.0'
-            major: '6'
-            node: '24.14.0'
-            http: true
-          - astro: '7.0.0'
-            adapter: '14.0.0'
-            wrangler: '4.144.0'
-            major: '7'
-            node: '24.14.0'
-            http: false
-          - astro: '7.3.5'
-            adapter: '14.3.3'
-            wrangler: '4.144.0'
-            major: '7'
-            node: '24.14.0'
-            http: true
+      matrix: ${{ fromJSON(needs.package.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -99,9 +74,30 @@ jobs:
         with:
           name: astro-headers-package
           path: fixtures/astro-consumer
+      - name: Install repository browser tooling
+        if: matrix.astro == '7.3.5'
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium for pull requests
+        if: matrix.astro == '7.3.5'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Install all browser engines for release validation
+        if: matrix.astro == '7.3.5' && inputs.release_validation
+        run: pnpm exec playwright install --with-deps firefox webkit
       - name: Build packed consumer matrix
         env:
           FIXTURE_ASTRO_VERSION: ${{ matrix.astro }}
           FIXTURE_ADAPTER_VERSION: ${{ matrix.adapter }}
           FIXTURE_WRANGLER_VERSION: ${{ matrix.wrangler }}
+          FIXTURE_BROWSER_TESTS: ${{ matrix.astro == '7.3.5' && 'true' || 'false' }}
+          PLAYWRIGHT_PROJECTS: ${{ inputs.release_validation && 'chromium,firefox,webkit' || 'chromium' }}
         run: pnpm run test:compatibility
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compatibility-${{ matrix.astro }}-reports
+          path: |
+            test-results/compatibility/
+            test-results/playwright/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: ${{ inputs.release_validation && 30 || 14 }}
