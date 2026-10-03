@@ -6,7 +6,7 @@
     "url": "git+https://github.com/martinsilha/astro-cloudflare-pages-headers.git"
   },
   "description": "An Astro integration that generates Cloudflare Pages and Workers static headers and applies configured headers to Astro Worker responses.",
-  "version": "1.7.7-dev.1",
+  "version": "1.7.7",
   "type": "module",
   "packageManager": "pnpm@10.29.3",
   "exports": {
