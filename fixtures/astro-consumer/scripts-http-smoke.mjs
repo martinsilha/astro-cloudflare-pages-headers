@@ -338,6 +338,9 @@ try {
           ...process.env,
           PLAYWRIGHT_BASE_URL: origin,
           PLAYWRIGHT_PROJECTS: process.env.PLAYWRIGHT_PROJECTS ?? "chromium",
+          PLAYWRIGHT_NATIVE_CSP: String(
+            process.env.FIXTURE_NATIVE_CSP === "true",
+          ),
         },
         timeout: 10 * 60 * 1000,
         shell: process.platform === "win32",
