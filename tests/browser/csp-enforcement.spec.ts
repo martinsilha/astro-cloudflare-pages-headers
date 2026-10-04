@@ -123,7 +123,7 @@ for (const route of ["/docs/", "/docs/about/"]) {
     expect(pageErrors).toEqual([]);
     expect(
       consoleErrors.every((message) =>
-        /content security policy|refused to execute|refused to apply/i.test(
+        /content[- ]security[- ]policy|refused to execute|refused to apply/i.test(
           message,
         ),
       ),
