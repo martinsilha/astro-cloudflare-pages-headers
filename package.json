@@ -1,67 +1,94 @@
 {
-    "name": "astro-cloudflare-pages-headers",
-    "homepage": "https://github.com/martinsilha/astro-cloudflare-pages-headers",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/martinsilha/astro-cloudflare-pages-headers.git"
+  "name": "astro-cloudflare-pages-headers",
+  "homepage": "https://github.com/martinsilha/astro-cloudflare-pages-headers",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/martinsilha/astro-cloudflare-pages-headers.git"
+  },
+  "description": "An Astro integration that generates Cloudflare Pages and Workers static headers and applies configured headers to Astro Worker responses.",
+  "version": "1.7.7",
+  "type": "module",
+  "packageManager": "pnpm@10.29.3",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
-    "description": "A lightweight integration for Astro that automatically generates a Cloudflare Pages _headers file for deployments based on your server header configuration.",
-    "version": "1.7.7",
-    "type": "module",
-    "packageManager": "pnpm@10.29.3",
-    "exports": {
-        ".": "./index.ts"
-    },
-    "files": [
-        "src",
-        "index.ts"
-    ],
-    "keywords": [
-        "astro",
-        "astro-component",
-        "astro-integration",
-        "cloudflare-pages",
-        "tooling",
-        "utils",
-        "utility",
-        "withastro"
-    ],
-    "scripts": {
-        "astro": "astro",
-        "build": "astro check && astro build",
-        "clear": "rm -rf dist .astro node_modules",
-        "dev": "astro dev",
-        "lint": "eslint ./src",
-        "lint:fix": "eslint ./src --fix",
-        "start": "astro dev",
-        "preview": "astro build && astro preview",
-        "test": "pnpm run test:unit",
-        "test:unit": "vitest",
-        "types": "tsc --noEmit",
-        "update": "pnpm update --latest",
-        "upgrade": "pnpm dlx @astrojs/upgrade"
-    },
-    "devDependencies": {
-        "@astrojs/check": "^0.9.6",
-        "@eslint/eslintrc": "^3.3.3",
-        "@semantic-release/git": "^10.0.1",
-        "@types/node": "^22.19.11",
-        "@typescript-eslint/eslint-plugin": "^8.56.0",
-        "@typescript-eslint/parser": "^8.56.0",
-        "astro": "^5.17.3",
-        "astro-eslint-parser": "^1.3.0",
-        "eslint": "^9.39.3",
-        "eslint-plugin-import": "^2.32.0",
-        "semantic-release": "^25.0.3",
-        "typescript": "^5.9.3",
-        "vitest": "^3.2.4"
-    },
-    "peerDependencies": {
-        "astro": "^4.0.0 || ^5.0.0"
-    },
-    "pnpm": {
-        "overrides": {
-            "lodash": "^4.17.23"
-        }
+    "./middleware": {
+      "types": "./dist/src/runtime.d.ts",
+      "import": "./dist/src/runtime.js"
     }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "astro",
+    "astro-component",
+    "astro-integration",
+    "cloudflare-pages",
+    "tooling",
+    "utils",
+    "utility",
+    "withastro",
+    "cloudflare-workers",
+    "astro-7"
+  ],
+  "scripts": {
+    "build": "pnpm run build:lib",
+    "clear": "rm -rf dist .astro node_modules",
+    "dev": "astro dev",
+    "lint": "eslint ./src",
+    "lint:fix": "eslint ./src --fix",
+    "start": "astro dev",
+    "preview": "astro build && astro preview",
+    "test": "pnpm run test:unit",
+    "test:unit": "vitest run --config vitest.config.ts src",
+    "types": "tsc --noEmit",
+    "update": "pnpm update --latest",
+    "upgrade": "pnpm dlx @astrojs/upgrade",
+    "build:lib": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build:lib",
+    "test:compatibility": "node scripts/run-isolated-compatibility.mjs",
+    "test:property": "vitest run --config vitest.config.ts tests/properties",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage src tests/properties",
+    "test:coverage:check": "pnpm run test:coverage && node scripts/check-coverage.mjs",
+    "test:browser": "playwright test --config playwright.config.ts",
+    "test:mutation": "stryker run stryker.config.mjs --concurrency 2",
+    "test:mutation:nightly": "stryker run stryker.nightly.config.mjs --concurrency 2",
+    "test:dependency-drift": "node scripts/run-dependency-drift.mjs",
+    "test:concurrency": "node scripts/run-concurrent-compatibility.mjs",
+    "test:release": "node --test scripts/*.test.mjs"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.6",
+    "@eslint/eslintrc": "^3.3.3",
+    "@playwright/test": "1.63.0",
+    "@semantic-release/git": "^10.0.1",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
+    "@types/node": "^22.19.11",
+    "@typescript-eslint/eslint-plugin": "^8.56.0",
+    "@typescript-eslint/parser": "^8.56.0",
+    "@vitest/coverage-v8": "3.2.4",
+    "astro": "^7.3.5",
+    "astro-eslint-parser": "^1.3.0",
+    "eslint": "^9.39.3",
+    "eslint-plugin-import": "^2.32.0",
+    "fast-check": "4.10.2",
+    "semantic-release": "^25.0.3",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "astro": "^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "lodash": "^4.17.23"
+    }
+  },
+  "engines": {
+    "node": ">=18.17.1"
+  }
 }

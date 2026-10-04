@@ -63,6 +63,15 @@ export default [
     }
   },
 
+  // Internal TypeScript imports use NodeNext ".js" specifiers that resolve to .ts source.
+  // The TypeScript compiler validates these mappings; eslint-plugin-import does not.
+  {
+    files: ['**/*.ts'],
+    rules: {
+      'import/no-unresolved': ['error', { ignore: ['\\.js$'] }]
+    }
+  },
+
   // 4. Custom rules
   // {
   //   rules: {

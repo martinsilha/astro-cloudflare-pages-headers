@@ -1,0 +1,103 @@
+name: Compatibility
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [dev, main]
+  workflow_call:
+    inputs:
+      release_validation:
+        description: Run all browser engines and keep reports for the release retention period.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - id: matrix
+        run: node scripts/read-compatibility-matrix.mjs >> "$GITHUB_OUTPUT"
+      - name: Run unit, property, type, and lint gates
+        run: pnpm run types && pnpm run lint && pnpm run test:coverage:check && pnpm run test:property && pnpm run test:release && pnpm run build:lib
+      - run: pnpm pack --pack-destination "$RUNNER_TEMP"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: astro-headers-package
+          path: ${{ runner.temp }}/astro-cloudflare-pages-headers-*.tgz
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: |
+            coverage/coverage-summary.json
+            coverage/lcov.info
+          if-no-files-found: ignore
+          retention-days: 14
+
+  consumer-matrix:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.package.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+          run_install: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: astro-headers-package
+          path: fixtures/astro-consumer
+      - name: Install repository browser tooling
+        if: matrix.astro == '7.3.5'
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium for pull requests
+        if: matrix.astro == '7.3.5'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Install all browser engines for release validation
+        if: matrix.astro == '7.3.5' && inputs.release_validation
+        run: pnpm exec playwright install --with-deps firefox webkit
+      - name: Build packed consumer matrix
+        env:
+          FIXTURE_ASTRO_VERSION: ${{ matrix.astro }}
+          FIXTURE_ADAPTER_VERSION: ${{ matrix.adapter }}
+          FIXTURE_WRANGLER_VERSION: ${{ matrix.wrangler }}
+          FIXTURE_BROWSER_TESTS: ${{ matrix.astro == '7.3.5' && 'true' || 'false' }}
+          PLAYWRIGHT_PROJECTS: ${{ inputs.release_validation && 'chromium,firefox,webkit' || 'chromium' }}
+        run: pnpm run test:compatibility
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compatibility-${{ matrix.astro }}-reports
+          path: |
+            test-results/compatibility/
+            test-results/playwright/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: ${{ inputs.release_validation && 30 || 14 }}
