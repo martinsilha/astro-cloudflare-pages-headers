@@ -11,6 +11,7 @@ import {
   inspectReleaseTarball,
   publishExactArtifact,
   verifyReleaseEvidence,
+  waitForRegistryIntegrity,
 } from "./semantic-release-exact-artifact.mjs";
 
 const credentials = {
@@ -308,4 +309,71 @@ test("adds a stable dist tag with the same registry authentication", async () =>
   ]);
   assert.equal(calls[0].options.env.NODE_AUTH_TOKEN, credentials.NPM_TOKEN);
   assert.equal(result.channel, "latest");
+});
+
+
+test("retries a temporarily invisible published version before consumer verification", async (context) => {
+  const fixture = await setup();
+  context.after(() => fs.rm(fixture.cwd, { recursive: true, force: true }));
+  const candidate = await inspectReleaseTarball({tarballPath: fixture.tarballPath, version: "1.2.3"});
+  const order = [];
+  let reads = 0;
+  await publishExactArtifact({
+    ...fixture, version: "1.2.3", channel: "dev", env: credentials, matrix,
+    runCanaries: async () => {},
+    registryReadOptions: {attempts: 3, delayMs: 1, wait: async () => { order.push("wait"); }},
+    postPublishSmoke: async () => { order.push("smoke"); },
+    commandRunner: async (_command, args) => {
+      order.push(args[0]);
+      if (args[0] === "view") {
+        assert.equal(args.includes("--prefer-online"), true);
+        if (++reads === 1) throw Object.assign(new Error("not visible"), {output: '{"error":{"code":"E404"}}'});
+        return JSON.stringify(candidate.integrity);
+      }
+      return "";
+    },
+  });
+  assert.deepEqual(order, ["publish", "view", "wait", "view", "smoke"]);
+  const report = JSON.parse(await fs.readFile(path.join(fixture.cwd, ".release-artifacts", "release-evidence.json"), "utf8"));
+  assert.equal(report.registryReadAttempts, 2);
+  assert.equal(report.postPublicationVerification, "passed");
+});
+
+test("bounds repeated npm visibility misses without republishing", async () => {
+  let reads = 0;
+  let waits = 0;
+  await assert.rejects(waitForRegistryIntegrity({
+    candidate: {name: "example", version: "1.2.3", integrity: "expected"},
+    env: credentials, cwd: process.cwd(), attempts: 3, delayMs: 1,
+    wait: async () => { waits++; },
+    commandRunner: async (_command, args) => {
+      assert.equal(args[0], "view");
+      reads++;
+      throw Object.assign(new Error("not visible"), {code: "E404"});
+    },
+  }), /not visible/);
+  assert.equal(reads, 3);
+  assert.equal(waits, 2);
+});
+
+test("does not retry authentication failures during registry verification", async () => {
+  let reads = 0;
+  await assert.rejects(waitForRegistryIntegrity({
+    candidate: {name: "example", version: "1.2.3", integrity: "expected"},
+    env: credentials, cwd: process.cwd(),
+    wait: async () => { assert.fail("authentication failure must not wait"); },
+    commandRunner: async () => { reads++; throw Object.assign(new Error("authentication failed"), {code: "E401"}); },
+  }), /authentication failed/);
+  assert.equal(reads, 1);
+});
+
+test("fails immediately when published integrity differs from the tested candidate", async () => {
+  let reads = 0;
+  await assert.rejects(waitForRegistryIntegrity({
+    candidate: {name: "example", version: "1.2.3", integrity: "expected"},
+    env: credentials, cwd: process.cwd(),
+    wait: async () => { assert.fail("integrity mismatch must not wait"); },
+    commandRunner: async () => { reads++; return JSON.stringify("different"); },
+  }), /integrity does not match/);
+  assert.equal(reads, 1);
 });

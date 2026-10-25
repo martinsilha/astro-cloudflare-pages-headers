@@ -204,6 +204,7 @@ async function existingRegistryIntegrity(
       name + "@" + version,
       "dist.integrity",
       "--json",
+      "--prefer-online",
       "--registry=https://registry.npmjs.org/",
     ],
     {
@@ -212,6 +213,43 @@ async function existingRegistryIntegrity(
     },
   );
   return output.replace(/^"|"$/g, "");
+}
+
+export async function waitForRegistryIntegrity({
+  candidate,
+  env,
+  cwd,
+  commandRunner,
+  attempts = 41,
+  delayMs = 15000,
+  wait = (milliseconds) =>
+    new Promise((resolve) => setTimeout(resolve, milliseconds)),
+}) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const integrity = await existingRegistryIntegrity(
+        candidate.name,
+        candidate.version,
+        env,
+        cwd,
+        commandRunner,
+      );
+      if (integrity !== candidate.integrity)
+        throw new Error(
+          "Published registry integrity does not match the release tarball.",
+        );
+      return { integrity, attempts: attempt };
+    } catch (error) {
+      const notVisible =
+        error.code === "E404" ||
+        /"code"\s*:\s*"E404"|npm (?:ERR!|error) code E404/.test(
+          error.output ?? error.message,
+        );
+      if (!notVisible || attempt === attempts) throw error;
+      await wait(delayMs);
+    }
+  }
+  throw new Error("Registry visibility verification requires at least one attempt.");
 }
 
 export async function publishExactArtifact({
@@ -226,6 +264,7 @@ export async function publishExactArtifact({
   runCanaries,
   postPublishSmoke = async () => {},
   commandRunner = run,
+  registryReadOptions = {},
 }) {
   assertReleaseCredentials(env);
   const evidence = await verifyReleaseEvidence(evidenceRoot, matrix);
@@ -307,17 +346,14 @@ export async function publishExactArtifact({
   report.published = true;
   await fs.writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
   try {
-    const registryIntegrity = await existingRegistryIntegrity(
-      candidate.name,
-      version,
-      publishEnv,
+    const registryVerification = await waitForRegistryIntegrity({
+      ...registryReadOptions,
+      candidate,
+      env: publishEnv,
       cwd,
       commandRunner,
-    );
-    if (registryIntegrity !== candidate.integrity)
-      throw new Error(
-        "Published registry integrity does not match the release tarball.",
-      );
+    });
+    report.registryReadAttempts = registryVerification.attempts;
     await postPublishSmoke(candidate.name, version);
     report.stages.push("registry-integrity-and-consumer-smoke-passed");
     report.postPublicationVerification = "passed";
