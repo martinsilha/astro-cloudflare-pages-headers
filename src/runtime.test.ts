@@ -9,7 +9,7 @@ describe("Astro middleware entrypoint", () => {
   it("returns the original response when the injected runtime config is disabled", async () => {
     vi.stubGlobal("__ASTRO_CLOUDFLARE_PAGES_HEADERS_CONFIG__", {
       enabled: false,
-      routes: {},
+      routes: { "/*": { "X-Disabled": "must-not-appear" } },
     });
     const { onRequest } = await import("./runtime.js");
     const response = new Response("body", { status: 202 });

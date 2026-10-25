@@ -1173,4 +1173,265 @@ describe("astro-cloudflare-pages-headers integration", () => {
     expect(output).toContain("X-Configured: new");
     expect(output).toContain("X-Configured: old");
   });
+  it("preserves the first duplicate directive and deduplicates sources and hashes", async () => {
+    const script = "duplicate()";
+    const hash = `'${hashSha256(script)}'`;
+    await fs.writeFile(path.join(dist, "index.html"), `<script>${script}</script><script>${script}</script>`);
+    await build({ headers: { "Content-Security-Policy": `; SCRIPT-SRC 'self' 'self' ${hash}; script-src https://ignored.example; upgrade-insecure-requests;;;` }, csp: { autoHashes: true, mode: "global" } });
+    const value = (await fs.readFile(path.join(dist, "_headers"), "utf8")).split("\n").find(line => line.includes("Content-Security-Policy:"));
+    // Existing hash means no policy expansion is necessary. Test the changed path
+    // separately with a second script, retaining first-directive browser semantics.
+    expect(value).toContain(hash);
+    await fs.writeFile(path.join(dist, "index.html"), `<script>${script}</script><script>second()</script>`);
+    await build({ headers: { "Content-Security-Policy": `; SCRIPT-SRC 'self' 'self' ${hash}; script-src https://ignored.example; upgrade-insecure-requests;;;` }, csp: { autoHashes: true, mode: "global" } });
+    const second = (await fs.readFile(path.join(dist, "_headers"), "utf8")).split("\n").find(line => line.includes("Content-Security-Policy:"));
+    expect(second).toBe(`  Content-Security-Policy: SCRIPT-SRC 'self' ${hash} '${hashSha256("second()") }'; upgrade-insecure-requests;`);
+  });
+
+  it.each(["hashStyleElements", "hashStyleAttributes", "hashInlineScripts"] as const)("hashes only the independently enabled %s category", async (category) => {
+    await fs.writeFile(path.join(dist, "index.html"), '<style media="screen">body { color: red; }</style><div style="color: blue"></div><script type="module">console.log("hello world")</script>');
+    await build({ headers: { "Content-Security-Policy": "default-src 'none'" }, csp: { autoHashes: true, mode: "global", hashStyleElements: false, hashStyleAttributes: false, hashInlineScripts: false, [category]: true } });
+    const output = await fs.readFile(path.join(dist, "_headers"), "utf8");
+    for (const [name, value] of [["hashStyleElements", "body { color: red; }"], ["hashStyleAttributes", "color: blue"], ["hashInlineScripts", 'console.log("hello world")']]) {
+      expect(output.includes(hashSha256(value))).toBe(name === category);
+    }
+  });
+
+  it("unions style and attribute hashes across pages in stable sorted order", async () => {
+    await fs.mkdir(path.join(dist, "nested"));
+    const styles = ["body { color: red; }", "p { color: blue; }"];
+    const attrs = ["padding: 1px", "margin: 2px"];
+    await fs.writeFile(path.join(dist, "index.html"), `<style>${styles[0]}</style><div style="${attrs[0]}"></div>`);
+    await fs.writeFile(path.join(dist, "nested", "other.html"), `<style>${styles[1]}</style><div style="${attrs[1]}"></div><style>${styles[0]}</style>`);
+    await build({ headers: { "Content-Security-Policy": "style-src 'none'; style-src-elem 'none'; style-src-attr 'none'" }, csp: { autoHashes: true, mode: "global" } });
+    const hashes = (values: string[]) => values.map(hashSha256).sort().map(hash => `'${hash}'`).join(" ");
+    expect(await fs.readFile(path.join(dist, "_headers"), "utf8")).toContain(`Content-Security-Policy: style-src ${hashes(styles)}; style-src-elem ${hashes(styles)}; style-src-attr 'unsafe-hashes' ${hashes(attrs)};`);
+  });
+
+  it.each([
+    ["&quot;&#34;&#x22;", '\"\"\"'],
+    ["&apos;&#39;&#x27;", "'''"],
+    ["&lt;&gt;&amp;", "<>&"],
+    ["&QUOT;&#X22;&APOS;&#X27;&LT;&GT;&AMP;", '\"\"\'\'<>&'],
+  ])("hashes raw and browser-decoded style attributes %s", async (encoded, decoded) => {
+    await fs.writeFile(path.join(dist, "index.html"), `<div style = "content:${encoded}"></div>`);
+    await build({ headers: { "Content-Security-Policy": "style-src 'none'" }, csp: { autoHashes: true, mode: "global" } });
+    const output = await fs.readFile(path.join(dist, "_headers"), "utf8");
+    expect(output).toContain(hashSha256(`content:${encoded}`));
+    expect(output).toContain(hashSha256(`content:${decoded}`));
+  });
+
+  it("uses valid SRI and excludes external scripts even with spaced attributes", async () => {
+    const integrity = "sha256-" + "b".repeat(43) + "=";
+    await fs.writeFile(path.join(dist, "index.html"), `<style media="screen" integrity = '${integrity}'>style-body</style><script type="module" integrity = "${integrity}">script-body</script><script src = "/asset.js">external-body</script><script src="/other.js">other-external-body</script><script> \n </script><style></style>`);
+    await build({ headers: { "Content-Security-Policy": "default-src 'none'" }, csp: { autoHashes: true, mode: "global" } });
+    const output = await fs.readFile(path.join(dist, "_headers"), "utf8");
+    expect(output).toContain(`style-src '${integrity}'`);
+    expect(output).toContain(`script-src '${integrity}'`);
+    for (const value of ["style-body", "script-body", "external-body", "other-external-body", " \n ", ""]) expect(output).not.toContain(hashSha256(value));
+  });
+
+  it("leaves HTML unchanged by default and reports no spurious configuration warnings", async () => {
+    const html = "<style>p{color:red}</style><script>default()</script>";
+    await fs.writeFile(path.join(dist, "index.html"), html);
+    await build({ headers: { "Content-Security-Policy": "default-src 'self'" } });
+    expect(await fs.readFile(path.join(dist, "_headers"), "utf8")).not.toContain("sha256-");
+    expect(await fs.readFile(path.join(dist, "index.html"), "utf8")).toBe(html);
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("reapplies named and wildcard captures while respecting preserved removals", async () => {
+    await fs.mkdir(path.join(dist, "articles", "hello"), { recursive: true });
+    await fs.writeFile(path.join(dist, "articles", "hello", "index.html"), "<script>article()</script>");
+    await fs.writeFile(path.join(dist, "_headers"), "/*\n  X-Removed: gone\n/articles/:slug\n  ! X-Removed\n  X-Manual: :slug\n/unmatched/*\n  X-Unrelated: no\n");
+    await build({ headers: { "/*": { "Content-Security-Policy": "default-src 'self'" }, "/articles/:slug": { "X-Named": ":slug :missing" }, "/articles/*": { "X-Wildcard": ":splat" } }, csp: { autoHashes: true } });
+    const output = await fs.readFile(path.join(dist, "_headers"), "utf8");
+    const exact = output.slice(output.indexOf("/articles/hello/\n"));
+    expect(exact).toContain("X-Named: hello :missing");
+    expect(exact).toContain("X-Wildcard: hello");
+    expect(exact).toContain("X-Manual: hello");
+    expect(exact).not.toContain("X-Removed:");
+    expect(exact).not.toContain("X-Unrelated:");
+  });
+
+  it("rejects matching preserved host rules but ignores unrelated host and CSP rules", async () => {
+    await fs.writeFile(path.join(dist, "index.html"), "<script>root()</script>");
+    await fs.writeFile(path.join(dist, "_headers"), "https://example.com/*\n  X-Host: yes\n");
+    await expect(build({ headers: { "Content-Security-Policy": "default-src 'self'" }, csp: { autoHashes: true } })).rejects.toThrow("preserved host-qualified headers also match");
+    await fs.writeFile(path.join(dist, "_headers"), "/other/*\n  Content-Security-Policy: default-src 'none'\nhttps://example.com/other/*\n  X-Host: yes\n");
+    await build({ headers: { "/*": { "Content-Security-Policy": "default-src 'self'" }, "https://example.com/unrelated/*": { "X-Other": "yes" } }, csp: { autoHashes: true } });
+    expect(await fs.readFile(path.join(dist, "_headers"), "utf8")).toContain(hashSha256("root()"));
+  });
+
+  it.each([
+    ["auto-trailing-slash", "/docs/article"],
+    ["force-trailing-slash", "/docs/article/"],
+    ["drop-trailing-slash", "/docs/article"],
+    ["none", "/docs/article.html"],
+  ])("maps flat HTML through a base with %s", async (htmlHandling, route) => {
+    await fs.writeFile(path.join(dist, "article.html"), "<script>flat()</script>");
+    await fs.writeFile(path.join(dist, "wrangler.json"), JSON.stringify({ assets: { directory: ".", html_handling: htmlHandling } }));
+    await build({ headers: { "Content-Security-Policy": "default-src 'self'" }, csp: { autoHashes: true } }, undefined, "@astrojs/cloudflare", { base: "/docs/" });
+    expect(await fs.readFile(path.join(dist, "_headers"), "utf8")).toContain(`${route}\n# BEGIN`);
+  });
+
+  it("ignores ordinary redirects and non-HTML files when hashing", async () => {
+    await fs.writeFile(path.join(dist, "index.html"), "<script>valid()</script>");
+    await fs.writeFile(path.join(dist, "ignored.txt"), "<script>ignored()</script>");
+    await fs.writeFile(path.join(dist, "_redirects"), "\n# comment\n/old /index.html 200\n/* /index.html 301\n/* https://example.com 200\n");
+    await build({ headers: { "Content-Security-Policy": "default-src 'self'" }, csp: { autoHashes: true } });
+    const output = await fs.readFile(path.join(dist, "_headers"), "utf8");
+    expect(output).toContain(hashSha256("valid()"));
+    expect(output).not.toContain(hashSha256("ignored()"));
+  });
+
+  it("rejects conflicting full cache rules without an explicit asset resolution", async () => {
+    await expect(build({ headers: { "/*": { "Cache-Control": "public, max-age=1" }, "/:folder/*": { "Cache-Control": "no-store" } }, assetsDirectory: "dist" }, undefined, "@astrojs/cloudflare")).rejects.toThrow("Overlapping configured Cache-Control rules produce conflicting values");
+  });
+
+  it("preserves other asset headers when reconciling cache rules at a custom base", async () => {
+    await build({ headers: { "/*": { "Cache-Control": "no-store" }, "/docs/assets/*": { "cache-control": "public, max-age=3600", "X-Asset": "retained" } }, assetsDirectory: "dist" }, undefined, "@astrojs/cloudflare", { base: "/docs/", build: { assets: "/assets/" } });
+    const output = await fs.readFile(path.join(dist, "_headers"), "utf8");
+    expect(output).toContain("/docs/assets/*\n# BEGIN astro-cloudflare-pages-headers\n  X-Asset: retained\n  ! cache-control\n  cache-control: public, max-age=3600");
+  });
+
+  it("exposes disabled runtime config even for the Cloudflare adapter", async () => {
+    const result = await build({ headers: { "X-Test": "yes" }, runtime: false, assetsDirectory: "dist" }, undefined, "@astrojs/cloudflare");
+    const plugin = (result.config as unknown as { vite: { plugins: Array<{ config(): { define: Record<string, string> } }> } }).vite.plugins[0];
+    expect(JSON.parse(plugin.config().define.__ASTRO_CLOUDFLARE_PAGES_HEADERS_CONFIG__)).toEqual({ enabled: false, routes: { "/*": { "X-Test": "yes" } } });
+  });
+
+  it("publishes a CSP report with unique counts across all categories and pages", async () => {
+    await fs.mkdir(path.join(dist, "other"));
+    const html = '<style>p{color:red}</style><p style="color:blue"></p><script>report()</script>';
+    await fs.writeFile(path.join(dist, "index.html"), html);
+    await fs.writeFile(path.join(dist, "other", "index.html"), html);
+    await build({ headers: { "Content-Security-Policy": "default-src 'none'" }, csp: { autoHashes: true, mode: "global" } });
+    expect(logger.info).toHaveBeenCalledWith("[astro-cloudflare-pages-headers] CSP auto-hash patch completed: 1 inline style hashes, 1 style attribute hashes, 1 inline script hashes, 1 updated CSP headers.");
+  });
+
+  it("does not scan HTML when auto-hashing has no configured CSP policy", async () => {
+    const readDir = vi.spyOn(fs, "readdir").mockRejectedValue(new Error("HTML scan should not run"));
+    try {
+      await build({ headers: { "X-Test": "yes" }, csp: { autoHashes: true } });
+      expect(readDir).not.toHaveBeenCalled();
+      expect(logger.info).toHaveBeenCalledWith("[astro-cloudflare-pages-headers] CSP auto-hash patch completed: 0 inline style hashes, 0 style attribute hashes, 0 inline script hashes, 0 updated CSP headers.");
+    } finally { readDir.mockRestore(); }
+  });
+
+  it.each(["style", "attribute"])("guards fallback coverage when only %s hashes exist", async (category) => {
+    const html = category === "style" ? "<style>p{color:red}</style>" : '<p style="color:red"></p>';
+    await fs.writeFile(path.join(dist, "404.html"), html);
+    await expect(build({ headers: { "Content-Security-Policy": "default-src 'none'" }, csp: { autoHashes: true } })).rejects.toThrow("404 fallback");
+    await fs.rename(path.join(dist, "404.html"), path.join(dist, "index.html"));
+    await fs.writeFile(path.join(dist, "_redirects"), "/*   /index.html   200\r\n");
+    await expect(build({ headers: { "Content-Security-Policy": "default-src 'none'" }, csp: { autoHashes: true } })).rejects.toThrow("SPA fallback");
+    await build({ headers: { "Content-Security-Policy": "default-src 'none'" }, csp: { autoHashes: true, mode: "global" } });
+    expect(await fs.readFile(path.join(dist, "_headers"), "utf8")).toContain("sha256-");
+  });
+
+  it("permits a hash-free SPA fallback without inventing per-route overrides", async () => {
+    await fs.writeFile(path.join(dist, "index.html"), "<p>No inline behavior</p>");
+    await fs.writeFile(path.join(dist, "_redirects"), "/* /index.html 200\n");
+    await build({ headers: { "Content-Security-Policy": "default-src 'none'" }, csp: { autoHashes: true } });
+    expect(await fs.readFile(path.join(dist, "_headers"), "utf8")).not.toContain("! content-security-policy");
+  });
+
+  it("maps a root page under base and unions files mapped to the same served route", async () => {
+    await fs.mkdir(path.join(dist, "item"));
+    await fs.writeFile(path.join(dist, "index.html"), "<script>baseRoot()</script>");
+    await fs.writeFile(path.join(dist, "item.html"), "<style>a{color:red}</style>");
+    await fs.writeFile(path.join(dist, "item", "index.html"), '<div style="color:blue"></div>');
+    await fs.writeFile(path.join(dist, "wrangler.json"), JSON.stringify({ assets: { directory: ".", html_handling: "drop-trailing-slash" } }));
+    await build({ headers: { "Content-Security-Policy": "default-src 'none'" }, csp: { autoHashes: true } }, undefined, "@astrojs/cloudflare", { base: "/docs/" });
+    const output = await fs.readFile(path.join(dist, "_headers"), "utf8");
+    expect(output).toContain("/docs\n# BEGIN");
+    const block = output.slice(output.indexOf("/docs/item\n# BEGIN"));
+    expect(block).toContain(hashSha256("a{color:red}"));
+    expect(block).toContain(hashSha256("color:blue"));
+  });
+
+  it("retains the cause and path when redirects or HTML cannot be read", async () => {
+    const htmlPath = path.join(dist, "index.html");
+    await fs.writeFile(htmlPath, "<script>read()</script>");
+    const original = fs.readFile;
+    for (const target of [path.join(dist, "_redirects"), htmlPath]) {
+      const cause = Object.assign(new Error("access denied"), { code: "EACCES" });
+      const spy = vi.spyOn(fs, "readFile").mockImplementation(async (...args) => {
+        if (String(args[0]) === target) throw cause;
+        return original(...args);
+      });
+      try {
+        await expect(build({ headers: { "Content-Security-Policy": "default-src 'self'" }, csp: { autoHashes: true } })).rejects.toMatchObject({ message: expect.stringContaining(target), cause });
+      } finally { spy.mockRestore(); }
+    }
+  });
+
+  it("removes temporary output after an atomic write fails", async () => {
+    const spy = vi.spyOn(fs, "rename").mockRejectedValue(new Error("rename failed"));
+    try { await expect(build({ headers: { "X-Test": "yes" } })).rejects.toThrow("Could not write finalized"); }
+    finally { spy.mockRestore(); }
+    expect((await fs.readdir(dist)).filter(name => name.endsWith(".tmp"))).toEqual([]);
+  });
+
+  it("checks final preserved line lengths and reports overflow warnings", async () => {
+    await fs.writeFile(path.join(dist, "_headers"), `/manual\n  X-Preserved: ${"x".repeat(60)}\n`);
+    await expect(build({ headers: {}, csp: { maxHeaderLineLength: 50 } })).rejects.toThrow("Header line length overflow");
+    await build({ headers: {}, csp: { maxHeaderLineLength: 50, overflow: "warn" } });
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("Cloudflare allows at most 2,000 characters per line"));
+    expect(await fs.readFile(path.join(dist, "_headers"), "utf8")).toContain("X-Preserved:");
+  });
+
+  it("keeps valid matching cache policies and unrelated preserved headers without overrides", async () => {
+    await fs.writeFile(path.join(dist, "_headers"), "/*\n  X-Preserved: unrelated\n/elsewhere/*\n  Cache-Control: private\n/_astro/*\n  Cache-Control: public, max-age=60\n");
+    await build({ headers: { "/_astro/*": { "Cache-Control": "public, max-age=60", "X-Asset": "yes" }, "/other/*": { "Cache-Control": "private" } }, assetsDirectory: "dist" }, undefined, "@astrojs/cloudflare");
+    const output = await fs.readFile(path.join(dist, "_headers"), "utf8");
+    expect(output).toContain("X-Preserved: unrelated");
+    expect(output).not.toContain("! Cache-Control");
+  });
+
+  it("keeps an unrelated exact asset header from resolving conflicting cache policy", async () => {
+    await expect(build({ headers: { "/*": { "Cache-Control": "public" }, "/:directory/*": { "Cache-Control": "private" }, "/_astro/*": { "X-Asset": "yes" } }, assetsDirectory: "dist" }, undefined, "@astrojs/cloudflare")).rejects.toThrow("Overlapping configured Cache-Control");
+  });
+
+  it("writes provisional headers to the rendered directory and final deployable directory", async () => {
+    const assets = path.join(dist, "client");
+    await fs.mkdir(assets);
+    await fs.writeFile(path.join(dist, "wrangler.json"), JSON.stringify({ assets: { directory: "./client" } }));
+    await fs.writeFile(path.join(assets, "_headers"), "/*\n  X-Client: preserved\n");
+    let provisional = "";
+    await build({ headers: { "X-Test": "generated" } }, undefined, "@astrojs/cloudflare", {}, undefined, async () => { provisional = await fs.readFile(path.join(dist, "_headers"), "utf8"); });
+    expect(provisional).toContain("X-Test: generated");
+    const final = await fs.readFile(path.join(assets, "_headers"), "utf8");
+    expect(final).toContain("X-Test: generated");
+    expect(final).toContain("X-Client: preserved");
+    expect(logger.info).toHaveBeenCalledWith(`[astro-cloudflare-pages-headers] Wrote _headers during generated phase to ${assets}`);
+    expect(logger.info).toHaveBeenCalledWith(`[astro-cloudflare-pages-headers] Wrote _headers during done phase to ${assets}`);
+  });
+
+  it("does not emit before configuration and warns when a configured build has no headers", async () => {
+    const integration = astroCloudflarePagesHeaders();
+    const hooks = integration.hooks as unknown as Record<string, (input: unknown) => Promise<void>>;
+    await hooks["astro:build:generated"]({ dir: pathToFileURL(dist), logger });
+    expect(await fs.readdir(dist)).toEqual([]);
+    await build();
+    expect(logger.warn).toHaveBeenCalledWith("[astro-cloudflare-pages-headers] No headers configuration found in Astro config. Skipping _headers generation.");
+    expect(await fs.readdir(dist)).toEqual([]);
+  });
+
+  it("reports deprecated workers only when used", async () => {
+    await build({ headers: { "X-Test": "yes" }, workers: true });
+    expect(logger.warn).toHaveBeenCalledWith("[astro-cloudflare-pages-headers] The workers option is deprecated; wildcard routes are normalized automatically.");
+  });
+
+  it.each([null, {}, { csp: false }])("does not warn about native CSP without an enabled owner: %j", async (security) => {
+    await build({ headers: { "Content-Security-Policy": "default-src 'self'" } }, undefined, undefined, { security });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("detects a native CSP conflict in one of several routes", async () => {
+    await build({ headers: { "/unrelated": { "X-Test": "yes" }, "/*": { "Content-Security-Policy": "default-src 'self'" } } }, undefined, undefined, { security: { csp: true } });
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("Astro native CSP"));
+  });
+
 });
