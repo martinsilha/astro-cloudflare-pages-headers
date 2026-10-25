@@ -43,7 +43,7 @@ jobs:
           name: astro-headers-package
           path: ${{ runner.temp }}/astro-cloudflare-pages-headers-*.tgz
           if-no-files-found: error
-          retention-days: 14
+          retention-days: ${{ inputs.release_validation && 30 || 14 }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -52,7 +52,7 @@ jobs:
             coverage/coverage-summary.json
             coverage/lcov.info
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: ${{ inputs.release_validation && 30 || 14 }}
 
   consumer-matrix:
     needs: package
