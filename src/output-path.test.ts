@@ -261,4 +261,167 @@ describe("generated Cloudflare asset path resolution", () => {
       rendered,
     );
   });
+
+  it("preserves quoted comment markers, escaped quotes and backslashes in JSONC strings", async () => {
+    const { config, rendered } = await createConfig();
+    const filename = path.join(toPath(config.build.server), "wrangler.jsonc");
+    const directory = '../../client // assets /* literal */ "quoted" \\folder';
+    const metadata = JSON.stringify({ assets: { directory, not_found_handling: "single-page-application" } });
+    await fs.writeFile(filename, `/* a * inside / a block */\n${metadata}\n// final comment without newline`);
+    const result = await resolveGeneratedAssets(config, rendered, {});
+    expect(result).toEqual({
+      directory: path.resolve(path.dirname(filename), directory),
+      htmlHandling: "auto-trailing-slash",
+      notFoundHandling: "single-page-application",
+      configPath: filename,
+    });
+  });
+
+  it.each(["wrangler.json", "wrangler.jsonc", "wrangler.toml"])(
+    "looks for %s in outDir when server output has no generated metadata", async (name) => {
+      const { config, rendered } = await createConfig();
+      const filename = path.join(toPath(config.outDir), name);
+      await fs.writeFile(filename, name.endsWith("toml")
+        ? "[assets]\ndirectory='../deployed assets'\n"
+        : JSON.stringify({ assets: { directory: "../deployed assets" } }));
+      expect(await resolveGeneratedAssets(config, rendered, {})).toEqual({
+        directory: path.resolve(path.dirname(filename), "../deployed assets"),
+        htmlHandling: "auto-trailing-slash",
+        notFoundHandling: undefined,
+        configPath: filename,
+      });
+    },
+  );
+
+  it("uses rendered metadata after configurations without an assets directory", async () => {
+    const { config, rendered } = await createConfig();
+    await fs.writeFile(path.join(toPath(config.build.server), "wrangler.json"), '{}');
+    await fs.writeFile(path.join(toPath(config.outDir), "wrangler.jsonc"), '{"assets":{"directory":false}}');
+    await fs.writeFile(path.join(toPath(config.outDir), "wrangler.toml"), '[vars]\nSOMETHING="value"\n');
+    const filename = path.join(rendered, "wrangler.json");
+    await fs.writeFile(filename, '{"assets":{"directory":"../public"}}');
+    expect((await resolveGeneratedAssets(config, rendered, {}))).toEqual({
+      directory: path.resolve(rendered, "../public"),
+      htmlHandling: "auto-trailing-slash",
+      notFoundHandling: undefined,
+      configPath: filename,
+    });
+  });
+
+  it("prioritizes generated server metadata over output metadata and adapter guesses", async () => {
+    const { config, rendered } = await createConfig();
+    const server = toPath(config.build.server);
+    await fs.writeFile(path.join(server, "wrangler.json"), '{"assets":{"directory":"./deployed"}}');
+    await fs.writeFile(path.join(toPath(config.outDir), "wrangler.json"), '{"assets":{"directory":"./other"}}');
+    expect((await resolveGeneratedAssets(config, rendered, { adapterName: "@astrojs/cloudflare" })).directory)
+      .toBe(path.join(server, "deployed"));
+  });
+
+  it.each(["relative", "url"])("accepts a matching %s override without ignoring deployment metadata", async (kind) => {
+    const { root, config, rendered } = await createConfig();
+    const directory = path.join(root, "deployed");
+    const filename = path.join(toPath(config.build.server), "wrangler.json");
+    await fs.writeFile(filename, JSON.stringify({ assets: { directory } }));
+    const result = await resolveGeneratedAssets(config, rendered, {
+      explicitDirectory: kind === "url" ? pathToFileURL(directory) : "deployed/../deployed",
+    });
+    expect(result.directory).toBe(directory);
+    expect(result.configPath).toBe(filename);
+  });
+
+  it("rejects a mismatched file URL override", async () => {
+    const { root, config, rendered } = await createConfig();
+    await fs.writeFile(path.join(toPath(config.build.server), "wrangler.json"), '{"assets":{"directory":"./deployed"}}');
+    await expect(resolveGeneratedAssets(config, rendered, { explicitDirectory: pathToFileURL(path.join(root, "wrong")) }))
+      .rejects.toThrow("disagrees with the deployment asset directory");
+  });
+
+  it.each(["/", "///docs///"])("resolves a modern adapter original client with base %s", async (base) => {
+    const { root, config } = await createConfig();
+    config.base = base;
+    const originalClientDir = path.join(root, "original client");
+    const rendered = base === "/" ? originalClientDir : path.join(originalClientDir, "docs");
+    const result = await resolveGeneratedAssets(config, rendered, {
+      adapterName: "@astrojs/cloudflare", adapterVersion: 13, originalClientDir,
+    });
+    expect(result.directory).toBe(originalClientDir);
+  });
+
+  it("accepts the exact modern client root even when the base is nonempty", async () => {
+    const { config } = await createConfig();
+    const client = toPath(config.build.client);
+    expect((await resolveGeneratedAssets(config, client, { adapterName: "@astrojs/cloudflare", adapterVersion: 13 })).directory)
+      .toBe(path.resolve(client));
+  });
+
+  it("does not apply Cloudflare layout guesses to other adapters", async () => {
+    const { config, rendered } = await createConfig();
+    expect((await resolveGeneratedAssets(config, rendered, { adapterName: "@astrojs/node", adapterVersion: 12 })).directory)
+      .toBe(rendered);
+  });
+
+  it.each(["", "  "])("parses TOML assignments with %j spacing and ignores commented assignments", async (space) => {
+    const { config, rendered } = await createConfig();
+    const filename = path.join(toPath(config.build.server), "wrangler.toml");
+    await fs.writeFile(filename, `[assets]\n# directory = "wrong"\n# html_handling = "wrong"\n# not_found_handling = "wrong"\n  directory${space}=${space}'../../deployed'\n  html_handling${space}=${space}'none'\n  not_found_handling${space}=${space}'404-page'\n`);
+    expect(await resolveGeneratedAssets(config, rendered, {})).toEqual({
+      directory: path.resolve(path.dirname(filename), "../../deployed"),
+      htmlHandling: "none", notFoundHandling: "404-page", configPath: filename,
+    });
+  });
+
+  it("retains the original parsing and I/O failures as causes", async () => {
+    const { config, rendered } = await createConfig();
+    await fs.writeFile(path.join(toPath(config.build.server), "wrangler.json"), '{');
+    try {
+      await resolveGeneratedAssets(config, rendered, {});
+      expect.fail("malformed generated metadata must fail");
+    } catch (error) {
+      expect((error as Error).cause).toBeInstanceOf(SyntaxError);
+    }
+    const failure = Object.assign(new Error("permission denied"), { code: "EACCES" });
+    vi.spyOn(fs, "readFile").mockRejectedValue(failure);
+    await expect(resolveGeneratedAssets(config, rendered, {})).rejects.toMatchObject({ cause: failure });
+  });
+
+  it("walks from a nested adapter entry past unrelated package metadata", async () => {
+    const { root } = await createConfig();
+    const directory = path.join(root, "node_modules", "@astrojs", "cloudflare");
+    const nested = path.join(directory, "dist", "runtime");
+    await fs.mkdir(nested, { recursive: true });
+    await fs.writeFile(path.join(nested, "index.js"), "export {};\n");
+    await fs.writeFile(path.join(nested, "package.json"), JSON.stringify({ name: "unrelated", version: "99.0.0" }));
+    await fs.writeFile(path.join(directory, "package.json"), JSON.stringify({
+      name: "@astrojs/cloudflare", version: "13.8.2", main: "dist/runtime/index.js",
+    }));
+    expect(resolveCloudflareVersion(pathToFileURL(`${root}/`), "@astrojs/cloudflare")).toBe(13);
+    await fs.writeFile(path.join(directory, "package.json"), JSON.stringify({
+      name: "@astrojs/cloudflare", main: "dist/runtime/index.js",
+    }));
+    expect(resolveCloudflareVersion(pathToFileURL(`${root}/`), "@astrojs/cloudflare")).toBeUndefined();
+  });
+
+  it("normalizes relative strings and decodes file URLs without losing spaces", () => {
+    expect(toPath("relative assets/../final assets")).toBe(path.resolve("final assets"));
+    const absolute = path.resolve("some assets #1");
+    expect(toPath(pathToFileURL(absolute))).toBe(absolute);
+  });
+
+
+  it("removes trailing commas without changing comma/bracket sequences inside strings", async () => {
+    const { config, rendered } = await createConfig();
+    const filename = path.join(toPath(config.build.server), "wrangler.jsonc");
+    const directory = 'assets,]literal, }literal \\"quoted,]"';
+    await fs.writeFile(filename, `{
+      "ignored": ["value,]", {"quoted": "value,}",},],
+      "assets": {
+        "directory": ${JSON.stringify(directory)}, // preserve punctuation in directory
+        "html_handling": "none", /* trailing comma before closing object */
+      },
+    }`);
+    const result = await resolveGeneratedAssets(config, rendered, {});
+    expect(result.directory).toBe(path.resolve(path.dirname(filename), directory));
+    expect(result.htmlHandling).toBe("none");
+  });
+
 });

@@ -33,7 +33,9 @@ function parseJsonc(value: string): unknown {
 			index += 1;
 		} else clean += character;
 	}
-	return JSON.parse(clean.replace(/,\s*([}\]])/g, "$1")) as unknown;
+	// Match complete strings first so literal comma/bracket sequences stay intact.
+	const withoutTrailingCommas = clean.replace(/("(?:\\.|[^"\\])*")|,(?=\s*[}\]])/g, (_match, quoted: string | undefined) => quoted ?? "");
+	return JSON.parse(withoutTrailingCommas) as unknown;
 }
 
 export interface AssetLayoutConfig {

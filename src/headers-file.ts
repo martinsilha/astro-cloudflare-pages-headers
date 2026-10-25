@@ -106,6 +106,7 @@ export function extractHeaderFields(sources: string[]): HeaderField[] {
 	for (const source of new Set(sources.filter(Boolean))) {
 		for (const rule of parseHeaderFile(source).rules) {
 			for (const line of rule.lines) {
+				if (line.trimStart().startsWith("#")) continue;
 				const removal = line.match(/^\s+!\s+(.+)\s*$/);
 				if (removal) {
 					fields.push({ route: rule.pattern, name: removal[1].trim(), value: "", removal: true });

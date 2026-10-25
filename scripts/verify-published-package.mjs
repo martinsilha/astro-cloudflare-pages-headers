@@ -1,3 +1,4 @@
+import { publishedConsumerManifest } from "./published-consumer-manifest.mjs";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -52,23 +53,12 @@ try {
       !path.basename(source).endsWith(".tgz") &&
       path.basename(source) !== "pnpm-lock.yaml",
   });
-  const manifest = {
-    name: "astro-published-package-smoke",
-    private: true,
-    type: "module",
-    packageManager: "pnpm@10.29.3",
-    dependencies: {
-      astro: "7.3.5",
-      "@astrojs/cloudflare": "14.3.3",
-      [packageName]: packageName + "@" + version,
-    },
-    devDependencies: { typescript: "5.9.3", wrangler: "4.144.0" },
-  };
+  const manifest = publishedConsumerManifest(packageName, version);
   await fs.writeFile(
     path.join(fixtureRoot, "package.json"),
     JSON.stringify(manifest, null, 2) + "\n",
   );
-  const install = run("pnpm", ["install", "--no-frozen-lockfile"], {
+  run("pnpm", ["install", "--no-frozen-lockfile"], {
     env: { FIXTURE_PACKAGE_VERSION: version },
   });
   const resolved = run("pnpm", ["list", "--depth=0", "--json"], {
@@ -85,7 +75,7 @@ try {
         astro: "7.3.5",
         adapter: "14.3.3",
         resolved: packages,
-        installCompleted: Boolean(install),
+        installCompleted: true,
       },
       null,
       2,

@@ -127,3 +127,55 @@ describe("runtime response headers", () => {
 		expect(applyConfiguredHeaders(original, normalizeHeaders({ "X-Test": "no" }), new URL("https://site.example/"))).toBe(original);
 	});
 });
+
+describe("route and header edge contracts", () => {
+	it.each([null, undefined, [], 42, true, "headers"])("rejects non-map top-level options %s", (input) => {
+		expect(() => normalizeHeaders(input)).toThrow("headers option must be an object");
+	});
+	it.each([null, [], 42, true])("rejects non-map nested headers %s", (value) => {
+		expect(() => normalizeHeaders({ "/": value })).toThrow("must be an object of string values");
+	});
+	it.each(["relative", "/a\rb", "/a\nb", "https://[bad", "https://[::1]:443/", "https://example.com:", "https://*.example.com"])("rejects invalid route %s", (route) => {
+		expect(() => normalizeHeaders({ [route]: { "X-Test": "yes" } })).toThrow();
+	});
+	it("accepts bracketed hosts without ports and preserves independent headers across wildcard aliases", () => {
+		expect(normalizeHeaders({ "https://[::1]/": { "X": "v" } })).toEqual({ "https://[::1]/": { X: "v" } });
+		expect(normalizeHeaders({ "*": { "A": "one" }, "/*": { "B": "two", "b": "three" } })).toEqual({ "/*": { A: "one", b: "three" } });
+		expect(normalizeHeaders({ "*": { "A": "one" } })).toEqual({ "/*": { A: "one" } });
+		expect(() => normalizeHeaders({ "/:longName/:longName": { X: "v" } })).toThrow("repeats");
+	});
+	it("does not clone or touch a response when no route matches", () => {
+		const response = new Response("untouched");
+		expect(applyConfiguredHeaders(response, { "/elsewhere": { X: "v" } }, new URL("https://example.com/here"))).toBe(response);
+		expect(response.bodyUsed).toBe(false);
+	});
+	it("appends separate configured cookies while coalescing ordinary header names case-insensitively", () => {
+		const response = applyConfiguredHeaders(new Response(null), {
+			"/*": { "Set-Cookie": "a=1; Path=/", "X-Test": "one" },
+			"/": { "set-cookie": "b=2; Path=/", "x-test": "two" },
+		}, new URL("https://example.com/"));
+		expect(response.headers.getSetCookie()).toEqual(["a=1; Path=/", "b=2; Path=/"]);
+		expect(response.headers.get("x-test")).toBe("one, two");
+	});
+	it("matches a host-only rule only at its root and supports a raw universal alias", () => {
+		const rules = { "https://example.com": { "X-Host": "yes" }, "*": { "X-All": "yes" } };
+		const root = applyConfiguredHeaders(new Response(null), rules, new URL("https://example.com/"));
+		expect(root.headers.get("x-host")).toBe("yes");
+		expect(root.headers.get("x-all")).toBe("yes");
+		for (const url of ["https://example.com/nested", "https://other.com/"]) {
+			const result = applyConfiguredHeaders(new Response(null), rules, new URL(url));
+			expect(result.headers.has("x-host")).toBe(false);
+			expect(result.headers.get("x-all")).toBe("yes");
+		}
+	});
+	it("treats regex metacharacters and invalid placeholder prefixes literally", () => {
+		const rules = { "/file.css": { X: "literal" }, "/:1bad": { Y: "colon" }, "/:slug": { Z: ":slug :unknown :slug" } };
+		const exact = applyConfiguredHeaders(new Response(null), rules, new URL("https://example.com/file.css"));
+		expect(exact.headers.get("x")).toBe("literal");
+		expect(exact.headers.get("z")).toBe("file.css :unknown file.css");
+		const different = applyConfiguredHeaders(new Response(null), rules, new URL("https://example.com/fileXcss"));
+		expect(different.headers.has("x")).toBe(false);
+		const colon = applyConfiguredHeaders(new Response(null), rules, new URL("https://example.com/:1bad"));
+		expect(colon.headers.get("y")).toBe("colon");
+	});
+});
