@@ -19,6 +19,9 @@ test("published consumer CLI installs the exact version and records successful i
     for (const name of ["verify-published-package.mjs", "published-consumer-manifest.mjs"]) {
       await fs.copyFile(path.join(scriptsRoot, name), path.join(scripts, name));
     }
+    const locks = path.join(root, "fixtures", "astro-consumer", "locks");
+    await fs.mkdir(locks);
+    await fs.copyFile(path.join(scriptsRoot, "..", "fixtures", "astro-consumer", "locks", "astro-7.3.5.yaml"), path.join(locks, "astro-7.3.5.yaml"));
     const manifestPath = path.join(root, "observed-manifest.json");
     const commandsPath = path.join(root, "commands.jsonl");
     const stub = `#!${process.execPath}
@@ -30,6 +33,12 @@ if (args[0] === 'install') {
   const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
   if (manifest.dependencies['astro-cloudflare-pages-headers'] !== process.env.FIXTURE_PACKAGE_VERSION) process.exit(41);
   fs.writeFileSync(process.env.TEST_MANIFEST, JSON.stringify(manifest));
+  const workspace = fs.readFileSync('pnpm-workspace.yaml', 'utf8');
+  if (!workspace.includes('esbuild: true') || !workspace.includes('workerd: true')) process.exit(42);
+  if (args.includes('--lockfile-only')) {
+    const lock = fs.readFileSync('pnpm-lock.yaml', 'utf8').replaceAll('file:./astro-cloudflare-pages-headers.tgz', process.env.FIXTURE_PACKAGE_VERSION).replaceAll('file:astro-cloudflare-pages-headers.tgz', process.env.FIXTURE_PACKAGE_VERSION);
+    fs.writeFileSync('pnpm-lock.yaml', lock);
+  }
 }
 if (args[0] === 'list') process.stdout.write(JSON.stringify([{ dependencies: { 'astro-cloudflare-pages-headers': { version: '1.8.0-dev.1' } } }]));
 `;
@@ -48,11 +57,13 @@ if (args[0] === 'list') process.stdout.write(JSON.stringify([{ dependencies: { '
     assert.equal(manifest.dependencies["astro-cloudflare-pages-headers"], "1.8.0-dev.1");
     const report = JSON.parse(await fs.readFile(path.join(root, ".release-artifacts", "published-consumer-report.json"), "utf8"));
     assert.equal(report.installCompleted, true);
+    assert.equal(report.toolchainFrozen, true);
     assert.equal(report.version, "1.8.0-dev.1");
     assert.equal(report.resolved[0].dependencies["astro-cloudflare-pages-headers"].version, "1.8.0-dev.1");
     const commands = (await fs.readFile(commandsPath, "utf8")).trim().split("\n").map(JSON.parse);
     assert.deepEqual(commands.map(({ args }) => args), [
-      ["install", "--no-frozen-lockfile"],
+      ["install", "--lockfile-only", "--no-frozen-lockfile"],
+      ["install", "--frozen-lockfile"],
       ["list", "--depth=0", "--json"],
       ["exec", "tsc", "-p", "tsconfig.json"],
       ["exec", "tsc", "-p", "tsconfig.nodenext.json"],
