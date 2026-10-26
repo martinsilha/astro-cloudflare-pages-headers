@@ -1,6 +1,4 @@
-// Do not write code directly here, instead use the `src` folder!
-// Then, use this file to export everything you want your user to access.
-export { default } from './src/integration';
+export { default } from "./src/integration.js";
 export type {
 	AstroCloudflarePagesHeadersOptions,
 	AstroConfig,
@@ -10,4 +8,4 @@ export type {
 	HeadersFlat,
 	HeadersNested,
 	Routes,
-} from './src/types';
+} from "./src/types.js";

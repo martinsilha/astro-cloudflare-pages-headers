@@ -1,7 +1,8 @@
+import type { AstroConfig as NativeAstroConfig, AstroIntegrationLogger as NativeAstroIntegrationLogger } from "astro";
+
 export type HeadersFlat = Record<string, string>;
 export type HeadersNested = Record<string, Record<string, string>>;
 export type AstroHeaders = HeadersFlat | HeadersNested;
-
 export type Routes = Record<string, Record<string, string>>;
 
 export interface CspAutoHashesOptions {
@@ -16,18 +17,19 @@ export interface CspAutoHashesOptions {
 }
 
 export interface AstroCloudflarePagesHeadersOptions {
+	/** Preferred source for flat headers or route-to-header maps. */
+	headers?: AstroHeaders;
+	/** @deprecated Universal routes are normalized to `/*` automatically. */
 	workers?: boolean;
+	/** Apply configured headers to Astro responses. Defaults to auto for Cloudflare. */
+	runtime?: "auto" | boolean;
+	/** Override the detected static asset output directory. */
+	assetsDirectory?: string | URL;
 	csp?: CspAutoHashesOptions;
 }
 
-export interface AstroConfig {
-	server?: {
-		headers?: AstroHeaders;
-	};
-}
+/** @deprecated Use Astro's `AstroConfig` type. */
+export type AstroConfig = NativeAstroConfig;
 
-export interface AstroIntegrationLogger {
-	info(message: string): void;
-	warn(message: string): void;
-	error(message: string): void;
-}
+/** @deprecated Use Astro's `AstroIntegrationLogger` type. */
+export type AstroIntegrationLogger = NativeAstroIntegrationLogger;

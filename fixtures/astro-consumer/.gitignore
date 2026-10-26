@@ -1,0 +1,12 @@
+node_modules/
+.astro/
+.wrangler/
+pnpm-lock.yaml
+pnpm-workspace.yaml
+package.json
+astro-cloudflare-pages-headers.tgz
+.packed/
+output */
+client */
+server */
+dist/

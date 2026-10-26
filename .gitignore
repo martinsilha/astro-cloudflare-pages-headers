@@ -23,3 +23,11 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# Local test reports and generated coverage
+coverage/
+test-results/
+playwright-report/
+
+# Separate demo repository
+demo/

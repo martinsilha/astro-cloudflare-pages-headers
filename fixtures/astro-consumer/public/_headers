@@ -1,0 +1,4 @@
+# Fixture-owned manual headers
+/*
+  X-Manual-Header: preserve
+  X-Shared-Header: manual

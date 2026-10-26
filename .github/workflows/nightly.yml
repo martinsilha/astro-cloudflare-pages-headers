@@ -1,0 +1,119 @@
+name: Nightly Reliability
+
+on:
+  schedule:
+    - cron: "27 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-matrix-and-browsers:
+    uses: ./.github/workflows/compatibility.yml
+    with:
+      release_validation: true
+
+  deeper-reliability:
+    needs: pinned-matrix-and-browsers
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: astro-headers-package
+          path: fixtures/astro-consumer
+      - id: tarball
+        run: node scripts/read-package-tarball.mjs fixtures/astro-consumer >> "$GITHUB_OUTPUT"
+      - name: Run larger deterministic property suite
+        env:
+          RELIABILITY_NIGHTLY: "true"
+        run: pnpm run test:property
+      - name: Run complete mutation analysis
+        run: pnpm run test:mutation:nightly
+      - name: Prove parallel fixture isolation
+        env:
+          FIXTURE_PACKAGE_TARBALL: ${{ steps.tarball.outputs.tarball }}
+        run: node scripts/run-concurrent-compatibility.mjs
+      - name: Discover and exercise newer supported dependencies
+        env:
+          FIXTURE_PACKAGE_TARBALL: ${{ steps.tarball.outputs.tarball }}
+        run: pnpm run test:dependency-drift
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-reliability-reports
+          path: |
+            test-results/
+            coverage/
+            reports/
+            stryker-tmp/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  windows-package-and-paths:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Pack the current candidate
+        run: pnpm pack --pack-destination "$env:RUNNER_TEMP"
+      - name: Build packed Astro 7 consumer on Windows
+        env:
+          FIXTURE_ASTRO_VERSION: "7.3.5"
+          FIXTURE_ADAPTER_VERSION: "14.3.3"
+          FIXTURE_WRANGLER_VERSION: "4.144.0"
+          FIXTURE_BROWSER_TESTS: "false"
+        run: |
+          $package = Get-ChildItem "$env:RUNNER_TEMP/astro-cloudflare-pages-headers-*.tgz" | Select-Object -First 1
+          $env:FIXTURE_PACKAGE_TARBALL = $package.FullName
+          pnpm run test:compatibility
+
+  stale-cloudflare-cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: cloudflare-canary
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CF_TEST_PAGES_PROJECT: ${{ vars.CF_TEST_PAGES_PROJECT }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.14.0
+      - name: Remove only stale, suite-owned Cloudflare canaries
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' && env.CF_TEST_PAGES_PROJECT != '' }}
+        run: node scripts/cleanup-stale-cloudflare-canaries.mjs
+      - name: Record that cleanup credentials are not configured
+        if: ${{ env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == '' || env.CF_TEST_PAGES_PROJECT == '' }}
+        run: echo 'Stale canary cleanup skipped because the dedicated environment is missing credentials or variables.'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stale-cloudflare-cleanup-report
+          path: test-results/cloudflare/
+          if-no-files-found: ignore
+          retention-days: 30
