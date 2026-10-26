@@ -4,6 +4,8 @@ Astro integration for Cloudflare static assets and Workers responses. It writes 
 
 ## Support
 
+Start with the [static and SSR examples](docs/guides/static-and-ssr.md), or follow the [v1-to-v2 walkthrough](docs/migrations/2.0.md#upgrade-an-existing-project). For the underlying platform behavior, see the [article draft](docs/articles/headers-across-assets-and-ssr.md).
+
 The package declares stable Astro `^4`, `^5`, `^6`, and `^7` support. Use a Cloudflare adapter version whose own peer dependencies include your Astro version. Astro 4 and 5 projects can target Pages or Workers according to their adapter version. Astro 6 and 7 Cloudflare SSR deployments use Workers; their official adapters no longer target Pages. Static sites can still deploy their generated assets to Pages.
 
 The repository compatibility workflow builds the minimum and latest tested Astro/adapter pairs. Versions outside Astro 4–7, prereleases, future majors, and third-party adapters are not claimed as supported.
@@ -56,7 +58,7 @@ export default defineConfig({
   integrations: [
     astroCloudflarePagesHeaders({
       headers: {
-        '/assets/*': { 'Cache-Control': 'public, max-age=31536000, immutable' },
+        '/_astro/*': { 'Cache-Control': 'public, max-age=31536000, immutable' },
         '/*': { 'X-Content-Type-Options': 'nosniff' },
       },
     }),
